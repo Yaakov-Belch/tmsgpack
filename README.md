@@ -318,12 +318,15 @@ object.
 
 ## Development: Environment and testing
 
-**TODO**: `git clone`
-
 ```
+# Clone the repository
+cd ~/git/
+# git clone https://github.com/Yaakov-Belch/tmsgpack.git  # You need permissions for that.
+git clone https://github.com/Yaakov-Belch/tmsgpack.git
+
 # Create a virtual environment in your project directory
 cd ~/git/tmsgpack
-python3 -m venv venv
+python -m venv venv
 
 # Activate the virtual environment
 source venv/bin/activate
@@ -339,6 +342,67 @@ make test
 
 # Run one test
 pytest -v test/test_typed_objects.py
+```
+
+## Build, test, and publish to PyPI
+Follow the steps above in "Development": Clone this repository, create and activate
+a virtual environment, upgrade pip, install required dependencies; make test.
+```bash
+cd ~/git/tmsgpack
+source venv/bin/activate
+
+pip install build
+rm -rf dist/     # remove old builds
+python -m build  # puts results in dist/
+
+# Test the new package -- in a fresh test environment:
+
+# Create a fresh test environment
+deactivate
+python -m venv venv-test
+source venv-test/bin/activate
+pip install --upgrade pip
+pip install dist/tmsgpack-*.whl  # use the latest whl built.
+
+pip install pytest
+
+# These tests uses the source files:
+pytest -v test/
+TMSGPACK_PUREPYTHON=1 pytest -v test
+python -c "import tmsgpack; print(tmsgpack.__file__)"
+
+# These tests use the installed files:
+cd test
+pytest -v .
+TMSGPACK_PUREPYTHON=1 pytest -v .
+python -c "import tmsgpack; print(tmsgpack.__file__)"
+cd ..
+deactivate
+rm -rf venv-test
+```
+Upload to PyPi:
+```bash
+pip install twine
+
+# Register at pypi.org if you haven't
+# Connecting to upload.pypi.org
+# twine upload dist/*  # This does not work: Platform incompatible.
+twine upload dist/tmsgpack-*.tar.gz
+```
+
+Test in a separate virtual environment
+```bash
+deactivate
+rm -rf   ~/test-tmsgpack
+mkdir -p ~/test-tmsgpack
+cd       ~/test-tmsgpack
+python -m venv venv-test
+source venv-test/bin/activate
+pip install --upgrade pip
+pip install tmsgpack pytest
+python -c "import tmsgpack; print('Version:', tmsgpack.__version__)"
+pytest -v ~/git/tmsgpack/test/
+TMSGPACK_PUREPYTHON=1 pytest -v ~/git/tmsgpack/test/
 ```
 
 ## The tmsgpack format (version 0.1.0)

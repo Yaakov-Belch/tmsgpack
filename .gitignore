@@ -1,0 +1,16 @@
+MANIFEST
+build/*
+dist/*
+.tox
+*.pyc
+*.pyo
+*.so
+*~
+tmsgpack/__version__.py
+tmsgpack/*.cpp
+*.egg-info
+.eggs/
+/venv
+/tags
+/docs/_build
+.cache

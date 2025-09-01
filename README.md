@@ -341,7 +341,7 @@ make test
 pytest -v test/test_typed_objects.py
 ```
 
-## The tmsgpack format (version 0.0.1)
+## The tmsgpack format (version 0.1.0)
 The msgpack format defines two types of containers: maps and arrays (dicts and lists).
 They are encoded by a `container_header` that identifies the container type and the
 number of key-value pairs or array-elements that follow after the `container_header`:

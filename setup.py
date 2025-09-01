@@ -73,7 +73,7 @@ if sys.platform == "win32":
     macros = [("__LITTLE_ENDIAN__", "1")]
 
 ext_modules = []
-if not PYPY and not os.environ.get("MSGPACK_PUREPYTHON"):
+if not PYPY and not os.environ.get("TMSGPACK_PUREPYTHON"):
     ext_modules.append(
         Extension(
             "tmsgpack._ctmsgpack",

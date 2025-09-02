@@ -22,7 +22,6 @@
 typedef struct unpack_user {
     bool use_tuple;
     bool raw;
-    bool object_as_pairs;
     bool strict_dict_key;
 
     PyObject* from_dict;
@@ -163,7 +162,7 @@ static inline int unpack_callback_list_end(
 {
     if(*object_type != Py_None) {
         PyObject *new_c = PyObject_CallFunctionObjArgs(
-            u->from_list, *object_type, *c, NULL
+            u->from_list, *object_type, *c, NULL         //  YYY
         );
         Py_DECREF(*c);
         *c = new_c;
@@ -182,12 +181,7 @@ static inline int unpack_callback_dict(unpack_user* u, unsigned int n, tmsgpack_
         return -1;
     }
     PyObject *p;
-    if (u->object_as_pairs) {
-        p = PyTuple_New(n); // Or use tuple?
-    }
-    else {
-        p = PyDict_New();
-    }
+    p = PyDict_New();
     if (!p)
         return -1;
     *o = p;
@@ -203,16 +197,7 @@ static inline int unpack_callback_dict_item(unpack_user* u, unsigned int current
     if (PyUnicode_CheckExact(k)) {
         PyUnicode_InternInPlace(&k);
     }
-    if (u->object_as_pairs) {
-        tmsgpack_unpack_object item = PyTuple_Pack(2, k, v);
-        if (!item)
-            return -1;
-        Py_DECREF(k);
-        Py_DECREF(v);
-        PyTuple_SET_ITEM(*c, current, item);
-        return 0;
-    }
-    else if (PyDict_SetItem(*c, k, v) == 0) {
+    if (PyDict_SetItem(*c, k, v) == 0) {
         Py_DECREF(k);
         Py_DECREF(v);
         return 0;
@@ -223,9 +208,9 @@ static inline int unpack_callback_dict_item(unpack_user* u, unsigned int current
 static inline int unpack_callback_dict_end(
     unpack_user* u, PyObject** object_type, tmsgpack_unpack_object* c
 ){
-    if(u->object_as_pairs || *object_type != Py_None) {
+    if(*object_type != Py_None) {
         PyObject *new_c = PyObject_CallFunctionObjArgs(
-            u->from_dict, *object_type, *c, NULL
+            u->from_dict, *object_type, *c, NULL //  YYY
         );
         Py_DECREF(*c);
         *c = new_c;

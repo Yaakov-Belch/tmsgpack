@@ -36,12 +36,11 @@ def ut(**kwargs): return UnpackTracer(options=UnpackConfig(**kwargs))
 def run(
         input, expected,
         tuple_as_list=True, sort_keys=False,
-        use_tuple=False, strict_dict_key=False, object_as_pairs=False,
+        use_tuple=False, strict_dict_key=False,
 ):
     packed = packb(input, pack_ctrl=pt(tuple_as_list=tuple_as_list, sort_keys=sort_keys))
     output = unpackb(packed, unpack_ctrl=ut(
         use_tuple=use_tuple, strict_dict_key=strict_dict_key,
-        object_as_pairs=object_as_pairs,
     ))
     assert output == expected
 
@@ -86,10 +85,4 @@ def test_trace_obj():
     run(Bar(), ['list', 'Bar', ['Y', 1]])
     run(FooBar(as_list=0), ['dict', 'FooBar', {'as_list': 0, 'x': 1, 'y': 'Y'}])
     run(FooBar(as_list=1), ['list', 'FooBar', ['Y', 1, 1]])
-
-def test_object_as_pairs():
-    run([1,2,3], [1,2,3],                                     object_as_pairs=True)
-    run({'a':'a', 1:1}, ['dict', None, (('a', 'a'), (1, 1))], object_as_pairs=True)
-    run(Foo(), ['dict', 'Foo', (('y', 'Y'), ('x', 1))],       object_as_pairs=True)
-    run(Bar(), ['list', 'Bar', ['Y', 1]],                     object_as_pairs=True)
 

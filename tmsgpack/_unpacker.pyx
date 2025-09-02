@@ -23,7 +23,6 @@ cdef extern from "unpack.h":
     ctypedef struct tmsgpack_user:
         bint use_tuple
         bint raw
-        bint object_as_pairs
         bint strict_dict_key
 
         PyObject* from_dict;
@@ -50,7 +49,6 @@ cdef extern from "unpack.h":
 
 cdef inline init_ctx(unpack_context *ctx,
                      object from_dict, object from_list,
-                     bint object_as_pairs,
                      bint use_tuple, bint raw,
                      bint strict_dict_key,
                      const char* unicode_errors,
@@ -68,8 +66,6 @@ cdef inline init_ctx(unpack_context *ctx,
     ctx.user.max_bin_len  = max_bin_len
     ctx.user.max_list_len = max_list_len
     ctx.user.max_dict_len = max_dict_len
-
-    ctx.user.object_as_pairs = object_as_pairs
 
     ctx.user.giga = <PyObject*>giga
     ctx.user.unicode_errors = unicode_errors
@@ -134,7 +130,7 @@ def unpackb(object packed, *, object unpack_ctrl=None):
     get_data_from_buffer(packed, &view, &buf, &buf_len)
 
     try:
-        init_ctx(&ctx, from_dict, from_list, o.object_as_pairs,
+        init_ctx(&ctx, from_dict, from_list,
                  o.use_tuple, o.raw, o.strict_dict_key, cerr,
                  min(buf_len, o.max_str_len),
                  min(buf_len, o.max_bin_len),
@@ -206,7 +202,6 @@ cdef class Unpacker(object):
     # To maintain refcnt.
     cdef object from_dict
     cdef object from_list
-    cdef bint object_as_pairs
     cdef object unicode_errors
     cdef Py_ssize_t max_buffer_size
     cdef uint64_t stream_offset
@@ -255,7 +250,6 @@ cdef class Unpacker(object):
 
         init_ctx(&self.ctx,
                  self.from_dict, self.from_list,
-                 o.object_as_pairs,
                  o.use_tuple, o.raw, o.strict_dict_key, <const char*>cerr,
                  o.max_str_len, o.max_bin_len, o.max_list_len, o.max_dict_len)
 

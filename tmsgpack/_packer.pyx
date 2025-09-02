@@ -190,7 +190,7 @@ cdef class Packer(object):
                 elif PyList_CheckExact(o) or (tuple_as_list and PyTuple_CheckExact(o)):
                     as_dict, object_type, data = False, None, o
                 else:
-                    as_dict, object_type, data = self.from_obj(o)
+                    as_dict, object_type, data = self.from_obj(o)  # <== YYY
 
                 if as_dict:
                     d = <dict>data

@@ -62,10 +62,6 @@ class UnpackConfig:
     :param bool strict_dict_key:
         If true only str or bytes are accepted for dict (dict) keys. (default: False).
 
-    :param callable object_as_pairs:
-        If true, handles dicts as tuples of pairs.
-        Otherwise, as dicts (default: False).
-
     :param str unicode_errors:
         The error handler for decoding unicode. (default: 'strict')
         This option should be used only when you have tmsgpack data which
@@ -93,8 +89,7 @@ class UnpackConfig:
     """
 
     def __init__(self, read_size=16*1024, use_tuple=False, raw=False,
-                 strict_dict_key=False, object_as_pairs=False,
-                 unicode_errors='strict', max_buffer_size=0,
+                 strict_dict_key=False, unicode_errors='strict', max_buffer_size=0,
                  max_str_len=-1, max_bin_len=-1, max_list_len=-1, max_dict_len=-1):
         if max_buffer_size == 0: max_buffer_size = 2**32-1
         self.max_buffer_size = max_buffer_size
@@ -113,7 +108,6 @@ class UnpackConfig:
         self.use_tuple       = use_tuple
         self.raw             = raw
         self.strict_dict_key = strict_dict_key
-        self.object_as_pairs = object_as_pairs
         self.unicode_errors  = unicode_errors
 
 if os.environ.get("TMSGPACK_PUREPYTHON"):

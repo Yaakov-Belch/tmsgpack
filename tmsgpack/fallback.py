@@ -202,7 +202,6 @@ class Unpacker:
         self._strict_dict_key = bool(o.strict_dict_key)
         self._unicode_errors  = o.unicode_errors
         self._use_tuple       = o.use_tuple
-        self._object_as_pairs = o.object_as_pairs
         self._max_str_len  = o.max_str_len
         self._max_bin_len  = o.max_bin_len
         self._max_list_len = o.max_list_len
@@ -382,24 +381,20 @@ class Unpacker:
             if self._use_tuple:
                 ret = tuple(ret)
             if object_type is not None:
-                ret = self.from_list(object_type, ret)
+                ret = self.from_list(object_type, ret) # <== YYY
             return ret
         if typ == TYPE_DICT:
             object_type = self._unpack() # <= XXX
-            if self._object_as_pairs:
-                ret = tuple((self._unpack(), self._unpack()) for _ in range(n))
-                ret = self.from_dict(object_type, ret)
-            else:
-                ret = {}
-                for _ in range(n):
-                    key = self._unpack()
-                    if self._strict_dict_key and type(key) not in (str, bytes):
-                        raise ValueError("%s is not allowed for dict key" % str(type(key)))
-                    if type(key) is str:
-                        key = sys.intern(key)
-                    ret[key] = self._unpack()
-                if self._object_as_pairs or (object_type is not None):
-                    ret = self.from_dict(object_type, ret)
+            ret = {}
+            for _ in range(n):
+                key = self._unpack()
+                if self._strict_dict_key and type(key) not in (str, bytes):
+                    raise ValueError("%s is not allowed for dict key" % str(type(key)))
+                if type(key) is str:
+                    key = sys.intern(key)
+                ret[key] = self._unpack()
+            if object_type is not None:
+                ret = self.from_dict(object_type, ret) # <== YYY
             return ret
         if typ == TYPE_RAW:
             if self._raw:
@@ -566,7 +561,7 @@ class Packer:
             elif type(obj) in list_types:
                 as_dict, object_type, data = False, None, obj
             else:
-                as_dict, object_type, data = self.from_obj(obj)
+                as_dict, object_type, data = self.from_obj(obj) # <== YYY
 
             if as_dict:
                 _items = sorted(data.items()) if self._sort_keys else data.items()
@@ -575,7 +570,7 @@ class Packer:
             else:
                 n = len(data)
                 self._pack_list_header(n)
-                self._pack(object_type, nest_limit - 1)
+                self._pack(object_type, nest_limit - 1)  # <== XXX
                 for i in range(n):
                     self._pack(data[i], nest_limit - 1)
                 return
@@ -632,7 +627,7 @@ class Packer:
 
     def _pack_dict_pairs(self, n, object_type, pairs, nest_limit=DEFAULT_RECURSE_LIMIT):
         self._pack_dict_header(n)
-        self._pack(object_type, nest_limit - 1)
+        self._pack(object_type, nest_limit - 1)  # <== XXX
         for k, v in pairs:
             self._pack(k, nest_limit - 1)
             self._pack(v, nest_limit - 1)

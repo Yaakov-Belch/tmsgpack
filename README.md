@@ -23,7 +23,10 @@ This python package makes a minimal (backwards-incompatible) modification to the
 msgpack format to make all this elegantly possible.  This package is based on
 `msgpack v1.0.5`.
 
-## TODO: Installation
+## Installation
+```bash
+pip install tmsgpack
+```
 
 ## Usage
 Packing and unpacking data is controlled by `pack_ctrl` and `unpack_ctrl` objects (see

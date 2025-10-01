@@ -1,7 +1,7 @@
 """tmsgpack - Typed MessagePack serializer"""
 
 ####################### Keep version in sync with setup.cfg #######################
-__version__ = '0.2.0'                                                             #
+__version__ = '0.2.2'                                                             #
 ###################################################################################
 
 __all__ = [

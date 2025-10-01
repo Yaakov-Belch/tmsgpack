@@ -20,5 +20,3 @@ npm publish --dry-run     # Checks publication readiness.
 npm publish
 ```
 
-
-npm pack

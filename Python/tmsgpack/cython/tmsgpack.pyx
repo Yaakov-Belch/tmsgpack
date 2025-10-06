@@ -1,3 +1,8 @@
+# THIS FILE IS AUTOMATICALLY CREATED BY THE test-cython-run.sh SCRIPT!
+# DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
+
+__version__ = "0.2.2"
+
 from libc.stdint cimport int8_t, int16_t, int32_t, int64_t
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
 from cpython.long cimport PyLong_AsLongLong
@@ -60,7 +65,6 @@ cdef int64_t min_ConstNegInt = ConstNegInt - ui1_max  # This is -64
 
 # For Python interop, also define the type
 NoneType = type(None)
-
 
 # We may want to optimize codec access in the future:
 ctypedef object TMsgpackCodec
@@ -407,6 +411,7 @@ cdef class BaseDecodeBuffer:
     cpdef float64_t take_float8(self):
         cdef const char* data = self._take_bytes(sizeof(float64_t))
         return (<float64_t*>data)[0]
+
 cdef class SafeEncodeBuffer(BaseEncodeBuffer):
     """BaseEncodeBuffer that always encodes to little-endian regardless of platform"""
 
@@ -439,7 +444,6 @@ cdef class SafeEncodeBuffer(BaseEncodeBuffer):
     # Float
     cpdef BaseEncodeBuffer put_float8(self, float64_t value):
         return self.put_bytes(struct.pack('<d', value))
-
 
 cdef class SafeDecodeBuffer(BaseDecodeBuffer):
     """BaseDecodeBuffer that always decodes from little-endian regardless of platform"""
@@ -478,9 +482,5 @@ cdef class SafeDecodeBuffer(BaseDecodeBuffer):
 # Choose the appropriate implementation based on platform endianness
 EncodeBuffer = BaseEncodeBuffer if sys.byteorder == 'little' else SafeEncodeBuffer
 DecodeBuffer = BaseDecodeBuffer if sys.byteorder == 'little' else SafeDecodeBuffer
-
-class TMsgpackDecodingError(Exception):
-    pass
-
-class TMsgpackEncodingError(Exception):
-    pass
+class TMsgpackDecodingError(Exception): pass
+class TMsgpackEncodingError(Exception): pass

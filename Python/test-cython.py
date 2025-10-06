@@ -1,4 +1,6 @@
-from tmsgpack import basic_codec
+from tmsgpack import basic_codec, __version__
+
+print(f'{__version__=}')
 
 def main():
     check_round_trip(range(-2000, 2000), 'small integers')

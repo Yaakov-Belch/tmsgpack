@@ -1,3 +1,20 @@
+cdef class DecodeCtx:
+    cdef TMsgpackCodec    codec
+    cdef BaseEncodeBuffer ebuf
+    cdef uint64_t         len
+    cdef bint             used
+
+    def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
+        self.codec = codec
+        self.ebuf  = ebuf
+        self.len   = 0
+        self.used  = True    # Set to False direclty before use.
+
+    cdef mark_use(self, expect_used: bint):
+        if expect_used is not self.used:
+            if expect_used: raise TMsgpackDecodingError('dctx was not used.')
+            else:           raise TMsgpackDecodingError('dctx used twice.')
+        self.used = True
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""

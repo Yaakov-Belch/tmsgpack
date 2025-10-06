@@ -30,11 +30,13 @@ def main():
         1,2,3,4, {'a':'hello', 'b': ['world', 5,6,7]},
     ]], 'nested value')
 
-def check_round_trip(values, comment=''):
+    check_round_trip([Foo(1,2)], codec=MyCodec())
+
+def check_round_trip(values, comment='', codec=basic_codec):
     ok = not_ok = 0
     for value in values:
-        msg = basic_codec.encode(value)
-        new_value = basic_codec.decode(msg)
+        msg       = codec.encode(value)
+        new_value = codec.decode(msg)
         if new_value == value: ok += 1
         else:
             not_ok += 1
@@ -44,6 +46,38 @@ def check_round_trip(values, comment=''):
             print('-----------------------')
 
     print(f'{ok=} {not_ok=} {comment}')
+
+
+from tmsgpack import EncodeDecode, TMsgpackEncodingError, TMsgpackDecodingError
+from dataclasses import dataclass
+
+@dataclass
+class MyCodec(EncodeDecode):
+    sort_keys = True
+    def prep_encode(self, value, target): return [None, self, value]
+
+    def decode_codec(self, codec_type, source):
+        if codec_type is None: return self
+        raise TMsgpackDecodingError(f'Unsupported codec_type: {codec_type}')
+
+    def decompose_value(self, ectx):
+        if type(value:=ectx.value) is Foo:
+            ectx.put_dict('Foo', dict(x=value.x, y=value.y), ectx.sort_keys)
+        else:
+            raise TMsgpackEncodingError(f'Unsupported value: {ectx.value}')
+
+    def value_from_bytes(self, obj_type, data: bytes):
+        raise TMsgpackDecodingError(f'No bytes extension defined: {obj_type=} {data=}')
+
+    def value_from_list(self, obj_type, values: list):
+        if obj_type == 'Foo': return values  # Fix this soon!
+        raise TMsgpackDecodingError(f'No tuple extension defined: {obj_type=} {values=}')
+
+@dataclass
+class Foo:
+    x: int
+    y: int
+
 
 if __name__ == '__main__':
     main()

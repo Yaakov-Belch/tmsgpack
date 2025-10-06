@@ -72,14 +72,80 @@ ctypedef object TMsgpackCodec
 cdef class EncodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseEncodeBuffer ebuf
-    cdef uint64_t         len
+    cdef readonly object  value
     cdef bint             used
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
         self.codec = codec
         self.ebuf  = ebuf
-        self.len   = 0
+        self.value = None
+        self.used  = True    # Set to False direclty before use.
+
+    cdef _v(self, value):
+        self.value = value
         self.used  = False
+        return self
+
+    cdef mark_use(self, expect_used: bint):
+        if expect_used is not self.used:
+            if expect_used: raise TMsgpackEncodingError('ectx was not used.')
+            else:           raise TMsgpackEncodingError('ectx used twice.')
+        self.used = True
+
+    cpdef put_bytes(self, object _type, object value):
+        cdef BaseEncodeBuffer ebuf = self.ebuf
+        cdef uint64_t         _len
+        self.mark_use(False)
+        if type(value) is not bytes: raise TMsgpackEncodingError(f'not bytes: {value}')
+
+        bytes_val = <bytes>value
+        _len = <uint64_t>len(bytes_val)
+
+        if   _len ==  0:     ebuf.put_uint1(FixBytes0)
+        elif _len ==  1:     ebuf.put_uint1(FixBytes1)
+        elif _len ==  2:     ebuf.put_uint1(FixBytes2)
+        elif _len ==  4:     ebuf.put_uint1(FixBytes4)
+        elif _len ==  8:     ebuf.put_uint1(FixBytes8)
+        elif _len == 16:     ebuf.put_uint1(FixBytes16)
+        elif _len == 20:     ebuf.put_uint1(FixBytes20)
+        elif _len == 32:     ebuf.put_uint1(FixBytes32)
+        elif _len < ui1_max: ebuf.put_uint1(VarBytes1).put_uint1(<uint8_t>_len)
+        elif _len < ui2_max: ebuf.put_uint1(VarBytes2).put_uint2(<uint16_t>_len)
+        else:                ebuf.put_uint1(VarBytes8).put_uint8(<uint64_t>_len)
+
+        ectx_put_value(self, _type)
+        ebuf.put_bytes(bytes_val)
+
+    cpdef put_sequence(self, object _type, object value):
+        cdef uint64_t _len = <uint64_t>len(value)
+        self.mark_use(False)
+
+        _tuple_header(self.ebuf, _len)
+        ectx_put_value(self, _type)
+
+        for v in value: ectx_put_value(self, v)
+
+    cpdef put_dict(self, object _type, object value, bint sort=False):
+        cdef object   pairs = value.items()
+        cdef uint64_t _len  = <uint64_t>(2 * len(pairs))
+        if sort: pairs = sorted(pairs)
+
+        self.mark_use(False)
+        _tuple_header(self.ebuf, _len)
+        ectx_put_value(self, _type)
+
+        for k, v in pairs:
+            ectx_put_value(self, k)
+            ectx_put_value(self, v)
+
+    @property
+    def sort_keys(self): return self.codec.sort_keys
+
+cdef bint _tuple_header(BaseEncodeBuffer ebuf, uint64_t _len):
+    if   _len < 17:      ebuf.put_uint1(<uint8_t>(FixTuple0 + _len))
+    elif _len < ui1_max: ebuf.put_uint1(VarTuple1).put_uint1(<uint8_t>_len)
+    elif _len < ui2_max: ebuf.put_uint1(VarTuple2).put_uint2(<uint16_t>_len)
+    else:                ebuf.put_uint1(VarTuple8).put_uint8(<uint64_t>_len)
 
 cpdef BaseEncodeBuffer ebuf_put_value(
     TMsgpackCodec codec, BaseEncodeBuffer ebuf, object value
@@ -94,9 +160,6 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     cdef bytes str_bytes
     cdef uint64_t _len
     cdef bint bool_val
-    cdef uint8_t _mode
-    cdef object _type
-    cdef object new_value
     cdef bytes bytes_val
     cdef object pairs
 
@@ -141,70 +204,29 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 
     if t is NoneType: return ebuf.put_uint1(ConstValNone)
 
-    if   t is bytes: _mode, _type, new_value = 1, True,  value
-    elif t is tuple: _mode, _type, new_value = 2, True,  value
-    elif t is list:  _mode, _type, new_value = 2, False, value
-    elif t is dict:  _mode, _type, new_value = 4, None,  value
-    else:            _mode, _type, new_value = codec.decompose_value(value)
+    if   t is bytes: ectx._v(None).put_bytes(True, value)
+    elif t is tuple: ectx._v(None).put_sequence(True, value)
+    elif t is list:  ectx._v(None).put_sequence(False, value)
+    elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
+    else:            codec.decompose_value(ectx._v(value)); ectx.mark_use(True)
 
-    if _mode == 0: return ectx_put_value(ectx, new_value)
+cdef class DecodeCtx:
+    cdef TMsgpackCodec    codec
+    cdef BaseEncodeBuffer ebuf
+    cdef uint64_t         len
+    cdef bint             used
 
-    if _mode == 1:
-        if type(new_value) is not bytes:
-            raise TMsgpackEncodingError(f'not bytes: {new_value}')
+    def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
+        self.codec = codec
+        self.ebuf  = ebuf
+        self.len   = 0
+        self.used  = True    # Set to False direclty before use.
 
-        bytes_val = <bytes>new_value
-        _len = <uint64_t>len(bytes_val)
-
-        if   _len ==  0:     ebuf.put_uint1(FixBytes0)
-        elif _len ==  1:     ebuf.put_uint1(FixBytes1)
-        elif _len ==  2:     ebuf.put_uint1(FixBytes2)
-        elif _len ==  4:     ebuf.put_uint1(FixBytes4)
-        elif _len ==  8:     ebuf.put_uint1(FixBytes8)
-        elif _len == 16:     ebuf.put_uint1(FixBytes16)
-        elif _len == 20:     ebuf.put_uint1(FixBytes20)
-        elif _len == 32:     ebuf.put_uint1(FixBytes32)
-        elif _len < ui1_max: ebuf.put_uint1(VarBytes1).put_uint1(<uint8_t>_len)
-        elif _len < ui2_max: ebuf.put_uint1(VarBytes2).put_uint2(<uint16_t>_len)
-        else:                ebuf.put_uint1(VarBytes8).put_uint8(<uint64_t>_len)
-
-        ectx_put_value(ectx, _type)
-        return ebuf.put_bytes(bytes_val)
-
-    if _mode == 2:
-        _len = <uint64_t>len(new_value)
-        _tuple_header(ebuf, _len)
-        ectx_put_value(ectx, _type)
-
-        for v in new_value: ectx_put_value(ectx, v)
-        return ebuf
-
-    if _mode == 3:
-        if codec.sort_keys: _mode = 4
-        else:               _mode = 5
-
-    if (_mode == 4) or (_mode == 5):
-        if   _mode == 4: pairs = sorted(new_value.items())
-        elif _mode == 5: pairs = new_value.items()
-        else: raise TMsgpackEncodingError(f'Undefined _mode: {_mode}')
-
-        _len = <uint64_t>(2 * len(pairs))
-        _tuple_header(ebuf, _len)
-        ectx_put_value(ectx, _type)
-
-        for k, v in pairs:
-            ectx_put_value(ectx, k)
-            ectx_put_value(ectx, v)
-        return ebuf
-
-    raise TMsgpackEncodingError(f'Undefined _mode: {_mode}')
-
-cdef bint _tuple_header(BaseEncodeBuffer ebuf, uint64_t _len):
-    if   _len < 17:      ebuf.put_uint1(<uint8_t>(FixTuple0 + _len))
-    elif _len < ui1_max: ebuf.put_uint1(VarTuple1).put_uint1(<uint8_t>_len)
-    elif _len < ui2_max: ebuf.put_uint1(VarTuple2).put_uint2(<uint16_t>_len)
-    else:                ebuf.put_uint1(VarTuple8).put_uint8(<uint64_t>_len)
-
+    cdef mark_use(self, expect_used: bint):
+        if expect_used is not self.used:
+            if expect_used: raise TMsgpackDecodingError('dctx was not used.')
+            else:           raise TMsgpackDecodingError('dctx used twice.')
+        self.used = True
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""

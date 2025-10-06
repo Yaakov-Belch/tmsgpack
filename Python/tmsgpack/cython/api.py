@@ -2,6 +2,7 @@ from typing import Any, Tuple
 from dataclasses import dataclass
 from tmsgpack.cython.tmsgpack import EncodeBuffer, DecodeBuffer
 from tmsgpack.cython.tmsgpack import ebuf_put_value, dbuf_take_value
+from tmsgpack.cython.tmsgpack import TMsgpackEncodingError, TMsgpackDecodingError
 
 class EncodeDecode:
     def encode(self, value, target=None):
@@ -33,8 +34,8 @@ class BasicCodec(EncodeDecode):
         if codec_type is None: return self
         raise TMsgpackDecodingError(f'Unsupported codec_type: {codec_type}')
 
-    def decompose_value(self, value):
-        raise TMsgpackEncodingError(f'Unsupported value: {value}')
+    def decompose_value(self, ectx):
+        raise TMsgpackEncodingError(f'Unsupported value: {ectx.value}')
 
     def value_from_bytes(self, obj_type, data: bytes):
         raise TMsgpackDecodingError(f'No bytes extension defined: {obj_type=} {data=}')

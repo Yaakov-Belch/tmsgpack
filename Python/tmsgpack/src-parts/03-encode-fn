@@ -18,7 +18,7 @@ cdef class EncodeCtx:
         self.used  = False
         return self
 
-    cdef mark_use(self, expect_used: bint):
+    cdef mark_use(self, bint expect_used):
         if expect_used is not self.used:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')

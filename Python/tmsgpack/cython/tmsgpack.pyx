@@ -86,7 +86,7 @@ cdef class EncodeCtx:
         self.used  = False
         return self
 
-    cdef mark_use(self, expect_used: bint):
+    cdef mark_use(self, bint expect_used):
         if expect_used is not self.used:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
@@ -212,24 +212,30 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 
 cdef class DecodeCtx:
     cdef TMsgpackCodec    codec
-    cdef BaseEncodeBuffer ebuf
+    cdef BaseDecodeBuffer dbuf
     cdef uint64_t         len
     cdef bint             used
 
-    def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
+    def __cinit__(self, TMsgpackCodec codec, BaseDecodeBuffer dbuf):
         self.codec = codec
-        self.ebuf  = ebuf
+        self.dbuf  = dbuf
         self.len   = 0
         self.used  = True    # Set to False direclty before use.
 
-    cdef mark_use(self, expect_used: bint):
+    cdef mark_use(self, bint expect_used):
         if expect_used is not self.used:
             if expect_used: raise TMsgpackDecodingError('dctx was not used.')
             else:           raise TMsgpackDecodingError('dctx used twice.')
         self.used = True
 
+
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""
+    return dctx_take_value(DecodeCtx(codec, dbuf))
+
+cdef dctx_take_value(DecodeCtx dctx):
+    cdef TMsgpackCodec    codec = dctx.codec
+    cdef BaseDecodeBuffer dbuf  = dctx.dbuf
     cdef uint64_t _len
     cdef object   _type
     cdef list     _list

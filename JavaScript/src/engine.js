@@ -184,9 +184,9 @@ function ectx_put_value(ectx, value) {
 }
 
 class DecodeCtx {
-    constructor() {
+    constructor(codec, dbuf) {
         this.codec  = codec;
-        this.ebuf   = ebuf;
+        this.dbuf   = dbuf;
         this._len   = 0;
         this._type  = null;
         this._bytes = false;
@@ -208,13 +208,41 @@ class DecodeCtx {
         }
     }
 
+    take_list() {
+        this._mark_use(false)
+        if(this._bytes) { throw TMsgpackDecodingError('take_list called for bytes') }
 
+        const _list = [];
+        for (let i = 0; i < this._len; i++) { _list.push(dctx_take_value(this)); }
+        return _list
+    }
+
+    take_dict() {
+        this._mark_use(false)
+        if(this._bytes) { throw TMsgpackDecodingError('take_dict called for bytes') }
+
+        const result = {};
+        for (let i = 0; i < this._len; i += 2) {
+            const k = dctx_take_value(this)
+            const v = dctx_take_value(this)
+            result[k] = v;
+        }
+        return result;
+    }
+
+    take_bytes() {
+        this._mark_use(false)
+        if(!this._bytes) { throw TMsgpackDecodingError('take_bytes called for list') }
+        return this.dbuf.take_bytes(this._len)
+    }
 }
 
-
-
-
 export function dbuf_take_value(codec, dbuf) {
+    return dctx_take_value(new DecodeCtx(codec, dbuf))
+}
+function dctx_take_value(dctx) {
+    const codec = dctx.codec;
+    const dbuf  = dctx.dbuf;
     const opcode = dbuf.take_uint1();
 
     if (!(0 <= opcode && opcode < ui1_max)) {
@@ -240,14 +268,16 @@ export function dbuf_take_value(codec, dbuf) {
         else                           { _len = opcode - FixTuple0; } // FixTuple0-16
 
         const _type = dbuf_take_value(codec, dbuf);
-        const _list = [];
-        for (let i = 0; i < _len; i++) { _list.push(dbuf_take_value(codec, dbuf)); }
 
-        if (_type === true)  { return _list; }  // In JavaScript, tuples and list...
-        if (_type === false) { return _list; }  // ... are the same.
-        if (_type === null)  { return list_to_dict(_list); }
+        if(_type === true || _type === false) { // In JavaScript tuples are lists.
+            return dctx._ltb(_len, _type, false).take_list()
+        }
+        if (_type === null)  { return dctx._ltb(_len, _type, false).take_dict() }
 
         return codec.value_from_list(_type, _list);
+        const result = codec.value_from_list(dctx._ltb(_len, _type, false))
+        dctx._mark_use(true)
+        return result
     }
 
     if (FixBytes0 <= opcode) {
@@ -259,10 +289,11 @@ export function dbuf_take_value(codec, dbuf) {
         // The else branch catches FixBytes0/1/2/4/8/16/20/32
 
         const _type  = dbuf_take_value(codec, dbuf);
-        const _bytes = dbuf.take_bytes(_len);
 
-        if (_type === true) return _bytes;
-        return codec.value_from_bytes(_type, _bytes);
+        if (_type === true) { return dctx._ltb(_len, _type, true).take_bytes() }
+        const result = codec.value_from_bytes(dctx._ltb(_len, _type, true))
+        dctx._mark_use(True)
+        return result
     }
 
     if (FixStr0 <= opcode) {

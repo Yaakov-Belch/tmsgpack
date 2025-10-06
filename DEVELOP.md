@@ -15,7 +15,7 @@ npm login
 npm whoami
 
 # 3. Dry run to verify package contents
-npm pack                  # Creates tarball. No npm login needed
+# npm pack                # Creates tarball. No npm login needed
 npm publish --dry-run     # Checks publication readiness.
 
 # 4. Publish when ready

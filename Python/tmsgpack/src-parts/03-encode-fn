@@ -18,7 +18,7 @@ cdef class EncodeCtx:
         self._used = False
         return self
 
-    cdef mark_use(self, bint expect_used):
+    cdef _mark_use(self, bint expect_used):
         if expect_used is not self._used:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
@@ -27,7 +27,7 @@ cdef class EncodeCtx:
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
         cdef uint64_t         _len
-        self.mark_use(False)
+        self._mark_use(False)
         if type(value) is not bytes: raise TMsgpackEncodingError(f'not bytes: {value}')
 
         bytes_val = <bytes>value
@@ -50,7 +50,7 @@ cdef class EncodeCtx:
 
     cpdef put_sequence(self, object _type, object value):
         cdef uint64_t _len = <uint64_t>len(value)
-        self.mark_use(False)
+        self._mark_use(False)
 
         _tuple_header(self.ebuf, _len)
         ectx_put_value(self, _type)
@@ -62,7 +62,7 @@ cdef class EncodeCtx:
         cdef uint64_t _len  = <uint64_t>(2 * len(pairs))
         if sort: pairs = sorted(pairs)
 
-        self.mark_use(False)
+        self._mark_use(False)
         _tuple_header(self.ebuf, _len)
         ectx_put_value(self, _type)
 
@@ -92,8 +92,6 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     cdef bytes str_bytes
     cdef uint64_t _len
     cdef bint bool_val
-    cdef bytes bytes_val
-    cdef object pairs
 
     cdef object t = type(value)
 
@@ -140,5 +138,5 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is tuple: ectx._v(None).put_sequence(True, value)
     elif t is list:  ectx._v(None).put_sequence(False, value)
     elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
-    else:            codec.decompose_value(ectx._v(value)); ectx.mark_use(True)
+    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
 

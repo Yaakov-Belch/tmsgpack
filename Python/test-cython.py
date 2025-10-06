@@ -69,8 +69,8 @@ class MyCodec(EncodeDecode):
     def value_from_bytes(self, obj_type, data: bytes):
         raise TMsgpackDecodingError(f'No bytes extension defined: {obj_type=} {data=}')
 
-    def value_from_list(self, obj_type, values: list):
-        if obj_type == 'Foo': return values  # Fix this soon!
+    def value_from_list(self, dctx):
+        if dctx._type == 'Foo': return Foo(**dctx.take_dict())
         raise TMsgpackDecodingError(f'No tuple extension defined: {obj_type=} {values=}')
 
 @dataclass

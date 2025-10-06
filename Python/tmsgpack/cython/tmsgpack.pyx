@@ -86,7 +86,7 @@ cdef class EncodeCtx:
         self._used = False
         return self
 
-    cdef mark_use(self, bint expect_used):
+    cdef _mark_use(self, bint expect_used):
         if expect_used is not self._used:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
@@ -95,7 +95,7 @@ cdef class EncodeCtx:
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
         cdef uint64_t         _len
-        self.mark_use(False)
+        self._mark_use(False)
         if type(value) is not bytes: raise TMsgpackEncodingError(f'not bytes: {value}')
 
         bytes_val = <bytes>value
@@ -118,7 +118,7 @@ cdef class EncodeCtx:
 
     cpdef put_sequence(self, object _type, object value):
         cdef uint64_t _len = <uint64_t>len(value)
-        self.mark_use(False)
+        self._mark_use(False)
 
         _tuple_header(self.ebuf, _len)
         ectx_put_value(self, _type)
@@ -130,7 +130,7 @@ cdef class EncodeCtx:
         cdef uint64_t _len  = <uint64_t>(2 * len(pairs))
         if sort: pairs = sorted(pairs)
 
-        self.mark_use(False)
+        self._mark_use(False)
         _tuple_header(self.ebuf, _len)
         ectx_put_value(self, _type)
 
@@ -160,8 +160,6 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     cdef bytes str_bytes
     cdef uint64_t _len
     cdef bint bool_val
-    cdef bytes bytes_val
-    cdef object pairs
 
     cdef object t = type(value)
 
@@ -208,34 +206,62 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is tuple: ectx._v(None).put_sequence(True, value)
     elif t is list:  ectx._v(None).put_sequence(False, value)
     elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
-    else:            codec.decompose_value(ectx._v(value)); ectx.mark_use(True)
+    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
 
 cdef class DecodeCtx:
-    cdef TMsgpackCodec    codec
-    cdef BaseDecodeBuffer dbuf
-    cdef uint64_t         _len
-    cdef object           _type
-    cdef bint             _used
+    cdef TMsgpackCodec     codec
+    cdef BaseDecodeBuffer  dbuf
+    cdef readonly uint64_t _len
+    cdef readonly object   _type
+    cdef readonly bint     _bytes
+    cdef bint              _used
 
     def __cinit__(self, TMsgpackCodec codec, BaseDecodeBuffer dbuf):
-        self.codec = codec
-        self.dbuf  = dbuf
-        self._len  = 0
-        self._type = None
-        self._used = True    # Set to False direclty before use.
+        self.codec  = codec
+        self.dbuf   = dbuf
+        self._len   = 0
+        self._type  = None
+        self._bytes = False
+        self._used  = True    # Set to False direclty before use.
 
-    cdef _lt(self, _len, _type):
-        self._len  = _len
-        self._type = _type
-        self._used = False
+    cdef _ltb(self, _len, _type, _bytes):
+        self._len   = _len
+        self._type  = _type
+        self._used  = False
+        self._bytes = _bytes
         return self
 
-    cdef mark_use(self, bint expect_used):
+    cdef _mark_use(self, bint expect_used):
         if expect_used is not self._used:
             if expect_used: raise TMsgpackDecodingError('dctx was not used.')
             else:           raise TMsgpackDecodingError('dctx used twice.')
         self._used = True
 
+    cpdef list take_list(self):
+        self._mark_use(False)
+        if self._bytes: raise TMsgpackDecodingError('take_list called for bytes')
+
+        _list = []
+        for i in range(self._len): _list.append(dctx_take_value(self))
+        return _list
+
+    cpdef tuple take_tuple(self): return tuple(self.take_list())
+
+    cpdef dict take_dict(self):
+        self._mark_use(False)
+        if self._bytes: raise TMsgpackDecodingError('take_dict called for bytes')
+
+        _dict = {}
+        for i in range(self._len // 2):
+            k = dctx_take_value(self)
+            v = dctx_take_value(self)
+            _dict[k] = v
+        return _dict
+
+    cpdef bytes take_bytes(self):
+        self._mark_use(False)
+        if not self._bytes: raise TMsgpackDecodingError('take_bytes called for list')
+        return self.dbuf.take_bytes(self._len)
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""
@@ -246,9 +272,6 @@ cdef dctx_take_value(DecodeCtx dctx):
     cdef BaseDecodeBuffer dbuf  = dctx.dbuf
     cdef uint64_t _len
     cdef object   _type
-    cdef list     _list
-    cdef bytes    _bytes
-    cdef uint64_t i
 
     cdef uint8_t  opcode = dbuf.take_uint1()
 
@@ -274,15 +297,12 @@ cdef dctx_take_value(DecodeCtx dctx):
 
         _type = dbuf_take_value(codec, dbuf)
 
-        _list = [] # [None] * _len
-        for i in range(_len):
-            _list.append(dbuf_take_value(codec, dbuf))
-
-        if _type is True:  return tuple(_list)
-        if _type is False: return _list
-        if _type is None:  return list_to_dict(_list)
-
-        return codec.value_from_list(_type, _list)
+        if _type is True:  return dctx._ltb(_len, _type, False).take_tuple()
+        if _type is False: return dctx._ltb(_len, _type, False).take_list()
+        if _type is None:  return dctx._ltb(_len, _type, False).take_dict()
+        result = codec.value_from_list(dctx._ltb(_len, _type, False))
+        dctx._mark_use(True)
+        return result
 
     if FixBytes0 <= opcode:
         if   opcode == VarBytes1: _len = <uint64_t>dbuf.take_uint1()
@@ -292,10 +312,11 @@ cdef dctx_take_value(DecodeCtx dctx):
         # The else branch catches FixBytes0/1/2/4/8/16/20/32
 
         _type = dbuf_take_value(codec, dbuf)
-        _bytes = dbuf.take_bytes(<int>_len)
 
-        if _type is True: return _bytes
-        return codec.value_from_bytes(_type, _bytes)
+        if _type is True: return dctx._ltb(_len, _type, True).take_bytes()
+        result = codec.value_from_bytes(dctx._ltb(_len, _type, True))
+        dctx._mark_use(True)
+        return result
 
     if FixStr0 <= opcode:
         if opcode == VarStr1: return dbuf.take_str(<int>dbuf.take_uint1())
@@ -315,17 +336,6 @@ cdef dctx_take_value(DecodeCtx dctx):
 
 cdef list _map_consts = [True, False, None]  # ConstValTrue, ConstValFalse, ConstValNone
 cdef list _map_01248_16_20_32 = [0, 1, 2, 4, 8, 16, 20, 32]  # FixBytes0-FixBytes32
-
-cdef dict list_to_dict(list t):
-    cdef dict result = {}
-    cdef uint64_t i
-    cdef uint64_t length = len(t)
-
-    for i in range(0, length, 2):
-        if i + 1 < length: result[t[i]] = t[i + 1]
-        else: raise TMsgpackEncodingError(f'Dict with odd number of messages: {t}')
-
-    return result
 
 # BaseEncodeBuffer is correct only on little-endian architectures.
 # Most modern architectures are little-endian.

@@ -124,6 +124,13 @@ function _list_header(ebuf, _len) {
 }
 
 export function ebuf_put_value(codec, ebuf, value) {
+    return ectx_put_value(new EncodeCtx(codec, ebuf), value)
+}
+
+function ectx_put_value(ectx, value) {
+    const codec = ectx.codec
+    const ebuf = ectx.ebuf
+
     if (typeof value === 'number') {
         if (Number.isSafeInteger(value)) {                       // Integer path
             if (min_ConstNegInt <= value && value < 0) {
@@ -176,81 +183,10 @@ export function ebuf_put_value(codec, ebuf, value) {
     const is_list  = Array.isArray(value)
     const is_dict  = value && typeof value === 'object' && value.constructor === Object
 
-    if      (is_bytes) { _mode = 1; _type = true; new_value = value; }
-    else if (is_list)  { _mode = 2; _type = true; new_value = value; }
-    else if (is_dict)  { _mode = 4; _type = null; new_value = value; }
-    else               { [_mode, _type, new_value] = codec.decompose_value(value); }
-
-    if (_mode === 0) {
-        return ebuf_put_value(codec, ebuf, new_value);
-    }
-
-    if (_mode === 1) {
-        // Bytes handling
-        if (!(new_value instanceof Uint8Array)) {
-            throw new TMsgpackEncodingError(`not Uint8Array: ${new_value}`);
-        }
-
-        const _len = new_value.length;
-        if (_len === 0)          ebuf.put_uint1(FixBytes0);
-        else if (_len === 1)     ebuf.put_uint1(FixBytes1);
-        else if (_len === 2)     ebuf.put_uint1(FixBytes2);
-        else if (_len === 4)     ebuf.put_uint1(FixBytes4);
-        else if (_len === 8)     ebuf.put_uint1(FixBytes8);
-        else if (_len === 16)    ebuf.put_uint1(FixBytes16);
-        else if (_len === 20)    ebuf.put_uint1(FixBytes20);
-        else if (_len === 32)    ebuf.put_uint1(FixBytes32);
-        else if (_len < ui1_max) ebuf.put_uint1(VarBytes1).put_uint1(_len);
-        else if (_len < ui2_max) ebuf.put_uint1(VarBytes2).put_uint2(_len);
-        else                     ebuf.put_uint1(VarBytes8).put_uint8(_len);
-
-        ebuf_put_value(codec, ebuf, _type);
-        return ebuf.put_bytes(new_value);
-    }
-
-    if (_mode === 2) {
-        // List handling
-        const _len = new_value.length;
-        _list_header(ebuf, _len)
-
-        ebuf_put_value(codec, ebuf, _type);
-        for (const v of new_value) {
-            ebuf_put_value(codec, ebuf, v);
-        }
-        return ebuf;
-    }
-
-    if (_mode === 3) {
-        _mode = codec.sort_keys ? 4 : 5;
-    }
-
-    if (_mode === 4 || _mode === 5) {
-        // Object/dict handling
-        let pairs;
-        if (_mode === 4) {
-            // Sorted keys
-            pairs = Object.entries(new_value).sort(
-                ([a], [b]) => ebuf.collator.compare(a, b)
-            );
-        } else if (_mode === 5) {
-            // Original order
-            pairs = Object.entries(new_value);
-        } else {
-            throw new TMsgpackEncodingError(`Undefined _mode: ${_mode}`);
-        }
-
-        const _len = 2 * pairs.length;
-        _list_header(ebuf, _len)
-
-        ebuf_put_value(codec, ebuf, _type);
-        for (const [k, v] of pairs) {
-            ebuf_put_value(codec, ebuf, k);
-            ebuf_put_value(codec, ebuf, v);
-        }
-        return ebuf;
-    }
-
-    throw new TMsgpackEncodingError(`Unsupported value type: ${typeof value}`);
+    if      (is_bytes) { ectx._v(None).put_bytes(true, value) }
+    else if (is_list)  { ectx._v(None).put_sequence(true, value) }
+    else if (is_dict)  { ectx._v(None).put_dict(null, value, codec.sort_keys) }
+    else               { codec.decompose_value(ectx._v(value)); ectx._mark_use(true) }
 }
 
 class DecodeCtx {

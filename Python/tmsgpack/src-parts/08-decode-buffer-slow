@@ -1,0 +1,37 @@
+cdef class SafeDecodeBuffer(BaseDecodeBuffer):
+    """BaseDecodeBuffer that always decodes from little-endian regardless of platform"""
+
+    # Signed integers - override to use struct.unpack
+    cpdef int take_int1(self):
+        return struct.unpack('<b', self.take_bytes(1))[0]
+
+    cpdef int take_int2(self):
+        return struct.unpack('<h', self.take_bytes(2))[0]
+
+    cpdef int take_int4(self):
+        return struct.unpack('<i', self.take_bytes(4))[0]
+
+    cpdef long take_int8(self):
+        return struct.unpack('<q', self.take_bytes(8))[0]
+
+    # Unsigned integers
+    cpdef int take_uint1(self):
+        return struct.unpack('<B', self.take_bytes(1))[0]
+
+    cpdef int take_uint2(self):
+        return struct.unpack('<H', self.take_bytes(2))[0]
+
+    cpdef long take_uint4(self):
+        return struct.unpack('<I', self.take_bytes(4))[0]
+
+    cpdef long take_uint8(self):
+        return struct.unpack('<Q', self.take_bytes(8))[0]
+
+    # Float
+    cpdef float64_t take_float8(self):
+        return struct.unpack('<d', self.take_bytes(8))[0]
+
+
+# Choose the appropriate implementation based on platform endianness
+EncodeBuffer = BaseEncodeBuffer if sys.byteorder == 'little' else SafeEncodeBuffer
+DecodeBuffer = BaseDecodeBuffer if sys.byteorder == 'little' else SafeDecodeBuffer

@@ -1,0 +1,2 @@
+class TMsgpackDecodingError(Exception): pass
+class TMsgpackEncodingError(Exception): pass

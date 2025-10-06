@@ -1,0 +1,86 @@
+
+cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
+    """Take one msg out of dbuf and return the decoded value."""
+    cdef uint64_t _len
+    cdef object   _type
+    cdef list     _list
+    cdef bytes    _bytes
+    cdef uint64_t i
+
+    cdef uint8_t  opcode = dbuf.take_uint1()
+
+    if not (0 <= opcode < ui1_max):
+        raise TMsgpackDecodingError(f'Opcode out of range 0-255: {opcode}')
+
+    # Note: Reverse stacked ranges.
+    # Every range is bounded above by the range right before it.
+    # This is intentional and consistent with the format definition.
+    # It provides correct upper bounds for opcodes in each range.
+
+    if ConstNegInt <= opcode: return <int64_t>(opcode - ui1_max)  # negative integer
+
+    if NotUsed <= opcode: raise TMsgpackDecodingError(f'Undefined opcode: {opcode}')
+    if ConstValStart <= opcode: return _map_consts[opcode - ConstValStart]
+
+    if FixTuple0 <= opcode:
+        if   opcode == VarTuple1: _len = <uint64_t>dbuf.take_uint1()
+        elif opcode == VarTuple2: _len = <uint64_t>dbuf.take_uint2()
+        elif opcode == VarTuple8: _len = <uint64_t>dbuf.take_uint8()
+        else:                     _len = <uint64_t>(opcode - FixTuple0)
+        # The else branch handles FixTuple0, ..., FixTuple16
+
+        _type = dbuf_take_value(codec, dbuf)
+
+        _list = [] # [None] * _len
+        for i in range(_len):
+            _list.append(dbuf_take_value(codec, dbuf))
+
+        if _type is True:  return tuple(_list)
+        if _type is False: return _list
+        if _type is None:  return list_to_dict(_list)
+
+        return codec.value_from_list(_type, _list)
+
+    if FixBytes0 <= opcode:
+        if   opcode == VarBytes1: _len = <uint64_t>dbuf.take_uint1()
+        elif opcode == VarBytes2: _len = <uint64_t>dbuf.take_uint2()
+        elif opcode == VarBytes8: _len = dbuf.take_uint8()
+        else:                     _len = <uint64_t>_map_01248_16_20_32[opcode - FixBytes0]
+        # The else branch catches FixBytes0/1/2/4/8/16/20/32
+
+        _type = dbuf_take_value(codec, dbuf)
+        _bytes = dbuf.take_bytes(<int>_len)
+
+        if _type is True: return _bytes
+        return codec.value_from_bytes(_type, _bytes)
+
+    if FixStr0 <= opcode:
+        if opcode == VarStr1: return dbuf.take_str(<int>dbuf.take_uint1())
+        if opcode == VarStr2: return dbuf.take_str(<int>dbuf.take_uint2())
+        if opcode == VarStr8: return dbuf.take_str(<int>dbuf.take_uint8())
+        else:                 return dbuf.take_str(<int>(opcode - FixStr0))
+        # The else branch catches FixStr0, ..., FixStr15
+
+    if FixFloat8 <= opcode:   return dbuf.take_float8()
+    if FixInt2   <= opcode:
+        if opcode == FixInt2: return <int64_t>dbuf.take_int2()
+        if opcode == FixInt4: return <int64_t>dbuf.take_int4()
+        if opcode == FixInt8: return dbuf.take_int8()
+
+    if 0         <= opcode:   return <int64_t>opcode  # const integer
+
+
+cdef list _map_consts = [True, False, None]  # ConstValTrue, ConstValFalse, ConstValNone
+cdef list _map_01248_16_20_32 = [0, 1, 2, 4, 8, 16, 20, 32]  # FixBytes0-FixBytes32
+
+cdef dict list_to_dict(list t):
+    cdef dict result = {}
+    cdef uint64_t i
+    cdef uint64_t length = len(t)
+
+    for i in range(0, length, 2):
+        if i + 1 < length: result[t[i]] = t[i + 1]
+        else: raise TMsgpackEncodingError(f'Dict with odd number of messages: {t}')
+
+    return result
+

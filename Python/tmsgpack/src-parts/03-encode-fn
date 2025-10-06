@@ -1,10 +1,27 @@
 # We may want to optimize codec access in the future:
 ctypedef object TMsgpackCodec
 
+cdef class EncodeCtx:
+    cdef TMsgpackCodec    codec
+    cdef BaseEncodeBuffer ebuf
+    cdef uint64_t         len
+    cdef bint             used
+
+    def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
+        self.codec = codec
+        self.ebuf  = ebuf
+        self.len   = 0
+        self.used  = False
+
 cpdef BaseEncodeBuffer ebuf_put_value(
     TMsgpackCodec codec, BaseEncodeBuffer ebuf, object value
 ):
     """Encode value to a msg and put it into ebuf."""
+    return ectx_put_value(EncodeCtx(codec, ebuf), value)
+
+cdef ectx_put_value(EncodeCtx ectx, object value):
+    cdef TMsgpackCodec    codec = ectx.codec
+    cdef BaseEncodeBuffer ebuf  = ectx.ebuf
     cdef int64_t int_val
     cdef bytes str_bytes
     cdef uint64_t _len
@@ -62,7 +79,7 @@ cpdef BaseEncodeBuffer ebuf_put_value(
     elif t is dict:  _mode, _type, new_value = 4, None,  value
     else:            _mode, _type, new_value = codec.decompose_value(value)
 
-    if _mode == 0: return ebuf_put_value(codec, ebuf, new_value)
+    if _mode == 0: return ectx_put_value(ectx, new_value)
 
     if _mode == 1:
         if type(new_value) is not bytes:
@@ -83,15 +100,15 @@ cpdef BaseEncodeBuffer ebuf_put_value(
         elif _len < ui2_max: ebuf.put_uint1(VarBytes2).put_uint2(<uint16_t>_len)
         else:                ebuf.put_uint1(VarBytes8).put_uint8(<uint64_t>_len)
 
-        ebuf_put_value(codec, ebuf, _type)
+        ectx_put_value(ectx, _type)
         return ebuf.put_bytes(bytes_val)
 
     if _mode == 2:
         _len = <uint64_t>len(new_value)
         _tuple_header(ebuf, _len)
-        ebuf_put_value(codec, ebuf, _type)
+        ectx_put_value(ectx, _type)
 
-        for v in new_value: ebuf_put_value(codec, ebuf, v)
+        for v in new_value: ectx_put_value(ectx, v)
         return ebuf
 
     if _mode == 3:
@@ -105,11 +122,11 @@ cpdef BaseEncodeBuffer ebuf_put_value(
 
         _len = <uint64_t>(2 * len(pairs))
         _tuple_header(ebuf, _len)
-        ebuf_put_value(codec, ebuf, _type)
+        ectx_put_value(ectx, _type)
 
         for k, v in pairs:
-            ebuf_put_value(codec, ebuf, k)
-            ebuf_put_value(codec, ebuf, v)
+            ectx_put_value(ectx, k)
+            ectx_put_value(ectx, v)
         return ebuf
 
     raise TMsgpackEncodingError(f'Undefined _mode: {_mode}')

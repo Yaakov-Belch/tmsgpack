@@ -46,12 +46,12 @@ class EncodeCtx {
     constructor(codec, ebuf) {
         this.codec     = codec;
         this.ebuf      = ebuf;
-        this.value     = None;
+        this.value     = null;
         this.sort_keys = codec.sort_keys
         this._used     = true;   // Set to false direclty before use.
     }
 
-    _v(value) { this.value=value; this._used=False; return this}
+    _v(value) { this.value=value; this._used=false; return this}
 
     _mark_use(expect_used) {
         if(expect_used !== this._used) {
@@ -85,7 +85,7 @@ class EncodeCtx {
         return ebuf.put_bytes(value);
     }
 
-    put_sequence(self, _type, value) {
+    put_sequence(_type, value) {
         this._mark_use(false)
         const _len = value.length;
         const ebuf = this.ebuf
@@ -93,20 +93,16 @@ class EncodeCtx {
         _list_header(ebuf, _len)
 
         ectx_put_value(this, _type);
-        for (const v of new_value) { ectx_put_value(this, v) }
+        for (const v of value) { ectx_put_value(this, v) }
     }
 
-    put_dict(_type, value, sort=False) {
-        let pairs = Object.entries(new_value);
-        if (sort) {
-            pairs = pairs.sort(
-                ([a], [b]) => ebuf.collator.compare(a, b)
-            );
-        }
-
-        const ebuf = this.ebuf
-        const _len = 2 * pairs.length;
+    put_dict(_type, value, sort=false) {
+        const ebuf  = this.ebuf
+        let   pairs = Object.entries(value);
+        const _len  = 2 * pairs.length;
         _list_header(ebuf, _len)
+
+        if (sort) { pairs = pairs.sort(([a], [b]) => ebuf.collator.compare(a, b)) }
 
         ectx_put_value(this, _type);
         for (const [k, v] of pairs) {
@@ -176,16 +172,14 @@ function ectx_put_value(ectx, value) {
         return ebuf.put_uint1(ConstValNone);
     }
 
-    let _mode, _type, new_value;
-
     // Type detection for complex types
     const is_bytes = value instanceof Uint8Array
     const is_list  = Array.isArray(value)
     const is_dict  = value && typeof value === 'object' && value.constructor === Object
 
-    if      (is_bytes) { ectx._v(None).put_bytes(true, value) }
-    else if (is_list)  { ectx._v(None).put_sequence(true, value) }
-    else if (is_dict)  { ectx._v(None).put_dict(null, value, codec.sort_keys) }
+    if      (is_bytes) { ectx._v(null).put_bytes(true, value) }
+    else if (is_list)  { ectx._v(null).put_sequence(true, value) }
+    else if (is_dict)  { ectx._v(null).put_dict(null, value, codec.sort_keys) }
     else               { codec.decompose_value(ectx._v(value)); ectx._mark_use(true) }
 }
 
@@ -203,7 +197,7 @@ class DecodeCtx {
         this._len   = _len;
         this._type  = _type;
         this._bytes = _bytes;
-        this._used  = False;
+        this._used  = false;
         return this
     }
 

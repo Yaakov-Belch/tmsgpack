@@ -42,6 +42,87 @@ const ConstNegInt = 192;
 
 const min_ConstNegInt = ConstNegInt - ui1_max; // This is -64
 
+class EncodeCtx {
+    constructor(codec, ebuf) {
+        this.codec     = codec;
+        this.ebuf      = ebuf;
+        this.value     = None;
+        this.sort_keys = codec.sort_keys
+        this._used     = true;   // Set to false direclty before use.
+    }
+
+    _v(value) { this.value=value; this._used=False; return this}
+
+    _mark_use(expect_used) {
+        if(expect_used !== this._used) {
+            if(expect_used) { throw new TMsgpackEncodingError('ectx was not used.') }
+            else            { throw new TMsgpackEncodingError('ectx used twice.')   }
+        }
+    }
+
+    put_bytes(_type, value) {
+        this._mark_use(false);
+        const ebuf = this.ebuf;
+
+        if (!(value instanceof Uint8Array)) {
+            throw new TMsgpackEncodingError(`not Uint8Array: ${value}`);
+        }
+
+        const _len = value.length;
+        if (_len === 0)          ebuf.put_uint1(FixBytes0);
+        else if (_len === 1)     ebuf.put_uint1(FixBytes1);
+        else if (_len === 2)     ebuf.put_uint1(FixBytes2);
+        else if (_len === 4)     ebuf.put_uint1(FixBytes4);
+        else if (_len === 8)     ebuf.put_uint1(FixBytes8);
+        else if (_len === 16)    ebuf.put_uint1(FixBytes16);
+        else if (_len === 20)    ebuf.put_uint1(FixBytes20);
+        else if (_len === 32)    ebuf.put_uint1(FixBytes32);
+        else if (_len < ui1_max) ebuf.put_uint1(VarBytes1).put_uint1(_len);
+        else if (_len < ui2_max) ebuf.put_uint1(VarBytes2).put_uint2(_len);
+        else                     ebuf.put_uint1(VarBytes8).put_uint8(_len);
+
+        ectx_put_value(this, _type);
+        return ebuf.put_bytes(value);
+    }
+
+    put_sequence(self, _type, value) {
+        this._mark_use(false)
+        const _len = value.length;
+        const ebuf = this.ebuf
+
+        _list_header(ebuf, _len)
+
+        ectx_put_value(this, _type);
+        for (const v of new_value) { ectx_put_value(this, v) }
+    }
+
+    put_dict(_type, value, sort=False) {
+        let pairs = Object.entries(new_value);
+        if (sort) {
+            pairs = pairs.sort(
+                ([a], [b]) => ebuf.collator.compare(a, b)
+            );
+        }
+
+        const ebuf = this.ebuf
+        const _len = 2 * pairs.length;
+        _list_header(ebuf, _len)
+
+        ectx_put_value(this, _type);
+        for (const [k, v] of pairs) {
+            ectx_put_value(this, k);
+            ectx_put_value(this, v);
+        }
+    }
+}
+
+function _list_header(ebuf, _len) {
+    if      (_len < 17)      { ebuf.put_uint1(FixTuple0 + _len);          }
+    else if (_len < ui1_max) { ebuf.put_uint1(VarTuple1).put_uint1(_len); }
+    else if (_len < ui2_max) { ebuf.put_uint1(VarTuple2).put_uint2(_len); }
+    else                     { ebuf.put_uint1(VarTuple8).put_uint8(_len); }
+}
+
 export function ebuf_put_value(codec, ebuf, value) {
     if (typeof value === 'number') {
         if (Number.isSafeInteger(value)) {                       // Integer path
@@ -172,12 +253,36 @@ export function ebuf_put_value(codec, ebuf, value) {
     throw new TMsgpackEncodingError(`Unsupported value type: ${typeof value}`);
 }
 
-function _list_header(ebuf, _len) {
-    if      (_len < 17)      { ebuf.put_uint1(FixTuple0 + _len);          }
-    else if (_len < ui1_max) { ebuf.put_uint1(VarTuple1).put_uint1(_len); }
-    else if (_len < ui2_max) { ebuf.put_uint1(VarTuple2).put_uint2(_len); }
-    else                     { ebuf.put_uint1(VarTuple8).put_uint8(_len); }
+class DecodeCtx {
+    constructor() {
+        this.codec  = codec;
+        this.ebuf   = ebuf;
+        this._len   = 0;
+        this._type  = null;
+        this._bytes = false;
+        this._used  = true;   // Set to false direclty before use.
+    }
+
+    _ltb(_len, _type, _bytes) {
+        this._len   = _len;
+        this._type  = _type;
+        this._bytes = _bytes;
+        this._used  = False;
+        return this
+    }
+
+    _mark_use(expect_used) {
+        if(expect_used !== this._used) {
+            if(expect_used) { throw new TMsgpackDecodingError('dctx was not used.') }
+            else            { throw new TMsgpackDecodingError('dctx used twice.')   }
+        }
+    }
+
+
 }
+
+
+
 
 export function dbuf_take_value(codec, dbuf) {
     const opcode = dbuf.take_uint1();

@@ -5,24 +5,24 @@ cdef class EncodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseEncodeBuffer ebuf
     cdef readonly object  value
-    cdef bint             used
+    cdef bint             _used
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
         self.codec = codec
         self.ebuf  = ebuf
         self.value = None
-        self.used  = True    # Set to False direclty before use.
+        self._used = True    # Set to False direclty before use.
 
     cdef _v(self, value):
         self.value = value
-        self.used  = False
+        self._used = False
         return self
 
     cdef mark_use(self, bint expect_used):
-        if expect_used is not self.used:
+        if expect_used is not self._used:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
-        self.used = True
+        self._used = True
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf

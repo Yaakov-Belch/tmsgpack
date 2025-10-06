@@ -73,24 +73,24 @@ cdef class EncodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseEncodeBuffer ebuf
     cdef readonly object  value
-    cdef bint             used
+    cdef bint             _used
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
         self.codec = codec
         self.ebuf  = ebuf
         self.value = None
-        self.used  = True    # Set to False direclty before use.
+        self._used = True    # Set to False direclty before use.
 
     cdef _v(self, value):
         self.value = value
-        self.used  = False
+        self._used = False
         return self
 
     cdef mark_use(self, bint expect_used):
-        if expect_used is not self.used:
+        if expect_used is not self._used:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
-        self.used = True
+        self._used = True
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
@@ -213,20 +213,28 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 cdef class DecodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseDecodeBuffer dbuf
-    cdef uint64_t         len
-    cdef bint             used
+    cdef uint64_t         _len
+    cdef object           _type
+    cdef bint             _used
 
     def __cinit__(self, TMsgpackCodec codec, BaseDecodeBuffer dbuf):
         self.codec = codec
         self.dbuf  = dbuf
-        self.len   = 0
-        self.used  = True    # Set to False direclty before use.
+        self._len  = 0
+        self._type = None
+        self._used = True    # Set to False direclty before use.
+
+    cdef _lt(self, _len, _type):
+        self._len  = _len
+        self._type = _type
+        self._used = False
+        return self
 
     cdef mark_use(self, bint expect_used):
-        if expect_used is not self.used:
+        if expect_used is not self._used:
             if expect_used: raise TMsgpackDecodingError('dctx was not used.')
             else:           raise TMsgpackDecodingError('dctx used twice.')
-        self.used = True
+        self._used = True
 
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):

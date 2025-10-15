@@ -32,8 +32,8 @@ def main():
 
     yhub=TestRouterHub(id=111); codec=MyCodec(yhub=yhub, types=(Foo, Bar))
     check_not_supported([yhub], codec=codec, comment='yhub not encodable')
-    check_round_trip([Bar(1,2,yhub=yhub), Bar(11,22,yhub=yhub)], codec=codec)
-    check_round_trip([Foo(1,2), Foo(2,3)], codec=codec)
+    check_round_trip([Foo(1,2), Foo(2,3)], codec=codec, comment='Foo')
+    check_round_trip([Bar(1,2,yhub=yhub), Bar(3,4,yhub=yhub)], codec=codec, comment='Bar')
 
 def check_round_trip(values, comment='', codec=basic_codec):
     ok = not_ok = 0

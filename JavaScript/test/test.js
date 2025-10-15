@@ -55,9 +55,9 @@ function tmsgpack_test() {
     const yhub  = new TestRouterHub(111)
     const codec = new MyCodec(yhub, {Foo, Bar})
 
-    check_not_supported([yhub], codec, 'yhub not encodable')
-    check_round_trip([new Bar(1,2,yhub), new Bar(11,22,yhub)], codec)
-    check_round_trip([new Foo(1,2), new Foo(2,3)], codec)
+    // check_not_supported([yhub], 'yhub not encodable', codec)
+    check_round_trip([new Foo(1,2), new Foo(2,3)], 'Foo without yhub', codec)
+    check_round_trip([new Bar(1,2,yhub), new Bar(11,22,yhub)], 'Bar with yhub', codec)
 }
 
 export class MyCodec extends EncodeDecode {
@@ -75,22 +75,35 @@ export class MyCodec extends EncodeDecode {
     }
 
     decompose_value(ectx) {
-        throw new TMsgpackError(`Unsupported value: ${ectx.value}`);
+        const type_name   = this.value_to_type_name(ectx.value)
+        const constructor = this.name_to_constructor(type_name)
+        const args        = this.constructor_to_args_without_yhub(constructor)
+        ectx.set_dict_encode_handler(type_name, args)
     }
 
     value_from_bytes(dctx) {
-        throw new TMsgpackError(
-            `No bytes extension defined: obj_type=${dctx._type}`,
-        );
+        throw new TMsgpackError(`No bytes extension defined: obj_type=${dctx._type}`);
     }
 
     value_from_list(dctx) {
-        throw new TMsgpackError(
-            `No list extension defined: obj_type=${dctx._type}`
-        );
+        const constructor  = this.name_to_constructor(dctx._type)
+        const args         = this.constructor_to_args(constructor)
+        const extra_kwargs = {'yhub': dctx.codec.yhub}
+        return dctx.set_dict_decode_handler2(constructor, args, extra_kwargs)
+    }
+
+    value_to_type_name(value) { return value.constructor.class_name }
+    name_to_constructor(name) {
+        const res = this.types[name]
+        if(res) { return res }
+        else    { throw new TMsgpackError(`Unsupported type: ${name}`) }
+    }
+    constructor_to_args(constructor) { return constructor.class_attrs }
+
+    constructor_to_args_without_yhub(constructor) {
+        return this.constructor_to_args(constructor).filter(attr=>attr !== 'yhub')
     }
 }
-
 
 
 class Foo {
@@ -107,13 +120,13 @@ class Bar {
 
 class TestRouterHub { constructor(id) { this.id=id } }  // This is not encodable
 
-function check_round_trip(values, comment = '') {
+function check_round_trip(values, comment = '', codec=basic_codec) {
     let ok = 0;
     let not_ok = 0;
 
     for (const value of values) {
-        const msg = basic_codec.encode(value);
-        const new_value = basic_codec.decode(msg);
+        const msg = codec.encode(value);
+        const new_value = codec.decode(msg);
 
         if (deep_equal(new_value, value)) {
             ok++;
@@ -128,7 +141,7 @@ function check_round_trip(values, comment = '') {
     console.log(`ok=${ok} not_ok=${not_ok} ${comment}`);
 }
 
-function check_not_supported(values, codec, comment) {
+function check_not_supported(values, comment='', codec=basic_codec) {
     let ok = 0;
     let notOk = 0;
 

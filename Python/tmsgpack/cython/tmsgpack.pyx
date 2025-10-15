@@ -1,7 +1,7 @@
 # THIS FILE IS AUTOMATICALLY CREATED BY THE test-cython-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 from libc.stdint cimport int8_t, int16_t, int32_t, int64_t
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
@@ -91,6 +91,7 @@ cdef class EncodeCtx:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
         self._used = True
+        if expect_used: self.value = None
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
@@ -236,10 +237,11 @@ cdef class DecodeCtx:
             if expect_used: raise TMsgpackDecodingError('dctx was not used.')
             else:           raise TMsgpackDecodingError('dctx used twice.')
         self._used = True
+        if expect_used: self._len=0; self._type=None; self._bytes=False
 
     cpdef list take_list(self):
-        self._mark_use(False)
         if self._bytes: raise TMsgpackDecodingError('take_list called for bytes')
+        self._mark_use(False)
 
         _list = []
         for i in range(self._len): _list.append(dctx_take_value(self))
@@ -248,8 +250,8 @@ cdef class DecodeCtx:
     cpdef tuple take_tuple(self): return tuple(self.take_list())
 
     cpdef dict take_dict(self):
-        self._mark_use(False)
         if self._bytes: raise TMsgpackDecodingError('take_dict called for bytes')
+        self._mark_use(False)
 
         _dict = {}
         for i in range(self._len // 2):
@@ -259,8 +261,8 @@ cdef class DecodeCtx:
         return _dict
 
     cpdef bytes take_bytes(self):
-        self._mark_use(False)
         if not self._bytes: raise TMsgpackDecodingError('take_bytes called for list')
+        self._mark_use(False)
         return self.dbuf.take_bytes(self._len)
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):

@@ -23,6 +23,7 @@ cdef class EncodeCtx:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
         self._used = True
+        if expect_used: self.value = None
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf

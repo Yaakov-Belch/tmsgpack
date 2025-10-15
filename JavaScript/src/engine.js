@@ -58,6 +58,8 @@ class EncodeCtx {
             if(expect_used) { throw new TMsgpackEncodingError('ectx was not used.') }
             else            { throw new TMsgpackEncodingError('ectx used twice.')   }
         }
+        this._used = true;
+        if(expect_used) {this.value = null}
     }
 
     put_bytes(_type, value) {
@@ -206,6 +208,8 @@ class DecodeCtx {
             if(expect_used) { throw new TMsgpackDecodingError('dctx was not used.') }
             else            { throw new TMsgpackDecodingError('dctx used twice.')   }
         }
+        this._used = true;
+        if(expect_used) {this._len=0; this._type=null; this._bytes=false}
     }
 
     take_list() {

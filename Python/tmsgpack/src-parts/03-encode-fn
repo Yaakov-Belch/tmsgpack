@@ -5,17 +5,22 @@ cdef class EncodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseEncodeBuffer ebuf
     cdef readonly object  value
+    cdef object           cache_key
     cdef bint             _used
+    cdef dict             _decompose_value_cache
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
-        self.codec = codec
-        self.ebuf  = ebuf
-        self.value = None
-        self._used = True    # Set to False direclty before use.
+        self.codec     = codec
+        self.ebuf      = ebuf
+        self.value     = None
+        self.cache_key = None
+        self._used     = True    # Set to False directly before use.
+        self._decompose_value_cache = get_cached_dict(codec, '_decompose_value_cache')
 
-    cdef _v(self, value):
-        self.value = value
-        self._used = False
+    cdef _vk(self, value, cache_key):
+        self.value     = value
+        self.cache_key = cache_key
+        self._used     = False
         return self
 
     cdef _mark_use(self, bint expect_used):
@@ -23,7 +28,7 @@ cdef class EncodeCtx:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
         self._used = True
-        if expect_used: self.value = None
+        if expect_used: self.value=None; self.cache_key=None
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
@@ -135,9 +140,13 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 
     if t is NoneType: return ebuf.put_uint1(ConstValNone)
 
-    if   t is bytes: ectx._v(None).put_bytes(True, value)
-    elif t is tuple: ectx._v(None).put_sequence(True, value)
-    elif t is list:  ectx._v(None).put_sequence(False, value)
-    elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
-    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
+    if   t is bytes: ectx._vk(None, None).put_bytes(True, value)
+    elif t is tuple: ectx._vk(None, None).put_sequence(True, value)
+    elif t is list:  ectx._vk(None, None).put_sequence(False, value)
+    elif t is dict:  ectx._vk(None, None).put_dict(None, value, codec.sort_keys)
+    else:
+
+
+
+        codec.decompose_value(ectx._vk(value, None)); ectx._mark_use(True)
 

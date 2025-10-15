@@ -73,17 +73,22 @@ cdef class EncodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseEncodeBuffer ebuf
     cdef readonly object  value
+    cdef object           cache_key
     cdef bint             _used
+    cdef dict             _decompose_value_cache
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
-        self.codec = codec
-        self.ebuf  = ebuf
-        self.value = None
-        self._used = True    # Set to False direclty before use.
+        self.codec     = codec
+        self.ebuf      = ebuf
+        self.value     = None
+        self.cache_key = None
+        self._used     = True    # Set to False directly before use.
+        self._decompose_value_cache = get_cached_dict(codec, '_decompose_value_cache')
 
-    cdef _v(self, value):
-        self.value = value
-        self._used = False
+    cdef _vk(self, value, cache_key):
+        self.value     = value
+        self.cache_key = cache_key
+        self._used     = False
         return self
 
     cdef _mark_use(self, bint expect_used):
@@ -91,7 +96,7 @@ cdef class EncodeCtx:
             if expect_used: raise TMsgpackEncodingError('ectx was not used.')
             else:           raise TMsgpackEncodingError('ectx used twice.')
         self._used = True
-        if expect_used: self.value = None
+        if expect_used: self.value=None; self.cache_key=None
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
@@ -203,11 +208,15 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 
     if t is NoneType: return ebuf.put_uint1(ConstValNone)
 
-    if   t is bytes: ectx._v(None).put_bytes(True, value)
-    elif t is tuple: ectx._v(None).put_sequence(True, value)
-    elif t is list:  ectx._v(None).put_sequence(False, value)
-    elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
-    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
+    if   t is bytes: ectx._vk(None, None).put_bytes(True, value)
+    elif t is tuple: ectx._vk(None, None).put_sequence(True, value)
+    elif t is list:  ectx._vk(None, None).put_sequence(False, value)
+    elif t is dict:  ectx._vk(None, None).put_dict(None, value, codec.sort_keys)
+    else:
+
+
+
+        codec.decompose_value(ectx._vk(value, None)); ectx._mark_use(True)
 
 cdef class DecodeCtx:
     cdef TMsgpackCodec     codec
@@ -215,21 +224,28 @@ cdef class DecodeCtx:
     cdef readonly uint64_t _len
     cdef readonly object   _type
     cdef readonly bint     _bytes
+    cdef object           cache_key
     cdef bint              _used
+    cdef dict             _value_from_list_cache
+    cdef dict             _value_from_bytes_cache
 
     def __cinit__(self, TMsgpackCodec codec, BaseDecodeBuffer dbuf):
-        self.codec  = codec
-        self.dbuf   = dbuf
-        self._len   = 0
-        self._type  = None
-        self._bytes = False
-        self._used  = True    # Set to False direclty before use.
+        self.codec     = codec
+        self.dbuf      = dbuf
+        self._len      = 0
+        self._type     = None
+        self._bytes    = False
+        self.cache_key = None
+        self._used     = True    # Set to False direclty before use.
+        self._value_from_list_cache  = get_cached_dict(codec, '_value_from_list_cache')
+        self._value_from_bytes_cache = get_cached_dict(codec, '_value_from_bytes_cache')
 
-    cdef _ltb(self, _len, _type, _bytes):
-        self._len   = _len
-        self._type  = _type
-        self._used  = False
-        self._bytes = _bytes
+    cdef _ltbk(self, _len, _type, _bytes, cache_key):
+        self._len      = _len
+        self._type     = _type
+        self._bytes    = _bytes
+        self.cache_key = cache_key
+        self._used     = False
         return self
 
     cdef _mark_use(self, bint expect_used):
@@ -237,7 +253,7 @@ cdef class DecodeCtx:
             if expect_used: raise TMsgpackDecodingError('dctx was not used.')
             else:           raise TMsgpackDecodingError('dctx used twice.')
         self._used = True
-        if expect_used: self._len=0; self._type=None; self._bytes=False
+        if expect_used: self._len=0; self._type=self.cache_key=None; self._bytes=False;
 
     cpdef list take_list(self):
         if self._bytes: raise TMsgpackDecodingError('take_list called for bytes')
@@ -299,10 +315,10 @@ cdef dctx_take_value(DecodeCtx dctx):
 
         _type = dbuf_take_value(codec, dbuf)
 
-        if _type is True:  return dctx._ltb(_len, _type, False).take_tuple()
-        if _type is False: return dctx._ltb(_len, _type, False).take_list()
-        if _type is None:  return dctx._ltb(_len, _type, False).take_dict()
-        result = codec.value_from_list(dctx._ltb(_len, _type, False))
+        if _type is True:  return dctx._ltbk(_len, _type, False, None).take_tuple()
+        if _type is False: return dctx._ltbk(_len, _type, False, None).take_list()
+        if _type is None:  return dctx._ltbk(_len, _type, False, None).take_dict()
+        result = codec.value_from_list(dctx._ltbk(_len, _type, False, None))
         dctx._mark_use(True)
         return result
 
@@ -315,8 +331,8 @@ cdef dctx_take_value(DecodeCtx dctx):
 
         _type = dbuf_take_value(codec, dbuf)
 
-        if _type is True: return dctx._ltb(_len, _type, True).take_bytes()
-        result = codec.value_from_bytes(dctx._ltb(_len, _type, True))
+        if _type is True: return dctx._ltbk(_len, _type, True, None).take_bytes()
+        result = codec.value_from_bytes(dctx._ltbk(_len, _type, True, None))
         dctx._mark_use(True)
         return result
 
@@ -549,3 +565,7 @@ EncodeBuffer = BaseEncodeBuffer if sys.byteorder == 'little' else SafeEncodeBuff
 DecodeBuffer = BaseDecodeBuffer if sys.byteorder == 'little' else SafeDecodeBuffer
 class TMsgpackDecodingError(Exception): pass
 class TMsgpackEncodingError(Exception): pass
+
+cdef get_cached_dict(codec, attr):
+    if attr not in codec.__dict__: codec.__dict__[attr] = {}
+    return codec.__dict__[attr]

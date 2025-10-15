@@ -68,6 +68,6 @@ python -c "import tmsgpack; print('Version:', tmsgpack.__version__)"
 Publication
 ```
 git tag v0.2.4
-git push --follow-tags
+git push --tags
 ```
 

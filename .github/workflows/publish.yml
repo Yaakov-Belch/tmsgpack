@@ -25,7 +25,7 @@ jobs:
     - name: Build Python package
       run: |
         cd Python
-        python -m pip install build
+        python -m pip install build --sdist
         rm -rf dist/
         python -m build
 

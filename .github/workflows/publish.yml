@@ -40,6 +40,9 @@ jobs:
         node-version: '20'
         registry-url: 'https://registry.npmjs.org'
 
+    - name: Ensure npm 11.5.1 or later is installed
+      run: npm install -g npm@latest
+
     - name: Publish to NPM
       run: npm publish --provenance
       working-directory: ./JavaScript

@@ -28,7 +28,7 @@ export class EncodeDecode {
 }
 
 export class BasicCodec extends EncodeDecode {
-    constructor() { super(); this.sort_keys = true; }
+    constructor() { super(); this.sort_keys = true; this.use_cache = false; }
 
     prep_encode(value, target) { return [null, this, value]; }
 
@@ -37,19 +37,19 @@ export class BasicCodec extends EncodeDecode {
         throw new TMsgpackError(`Unsupported codec_type: ${codec_type}`);
     }
 
-    decompose_value(value) {
-        throw new TMsgpackError(`Unsupported value: ${value}`);
+    decompose_value(ectx) {
+        throw new TMsgpackError(`Unsupported value: ${ectx.value}`);
     }
 
-    value_from_bytes(obj_type, data) {
+    value_from_bytes(dctx) {
         throw new TMsgpackError(
-            `No bytes extension defined: obj_type=${obj_type} data=${data}`,
+            `No bytes extension defined: obj_type=${dctx._type}`,
         );
     }
 
-    value_from_list(obj_type, values) {
+    value_from_list(dctx) {
         throw new TMsgpackError(
-            `No list extension defined: obj_type=${obj_type} values=${values}`
+            `No list extension defined: obj_type=${dctx._type}`
         );
     }
 }

@@ -1,6 +1,4 @@
-import {basic_codec} from "../index.js"
-
-tmsgpack_test()
+import {basic_codec, EncodeDecode, TMsgpackError} from "../index.js"
 
 function tmsgpack_test() {
     check_round_trip(range(-2000, 2000), 'small integers');
@@ -53,7 +51,61 @@ function tmsgpack_test() {
     check_round_trip([[
         1, 2, 3, 4, {'a': 'hello', 'b': ['world', 5, 6, 7]}
     ]], 'nested value');
+
+    const yhub  = new TestRouterHub(111)
+    const codec = new MyCodec(yhub, {Foo, Bar})
+
+    check_not_supported([yhub], codec, 'yhub not encodable')
+    check_round_trip([new Bar(1,2,yhub), new Bar(11,22,yhub)], codec)
+    check_round_trip([new Foo(1,2), new Foo(2,3)], codec)
 }
+
+export class MyCodec extends EncodeDecode {
+    constructor(yhub, types) {
+        super();
+        this.sort_keys=true; this.use_cache=true;
+        this.yhub=yhub; this.types=types;
+    }
+
+    prep_encode(value, target) { return [null, this, value]; }
+
+    decode_codec(codec_type, source) {
+        if (codec_type === null) return this;
+        throw new TMsgpackError(`Unsupported codec_type: ${codec_type}`);
+    }
+
+    decompose_value(ectx) {
+        throw new TMsgpackError(`Unsupported value: ${ectx.value}`);
+    }
+
+    value_from_bytes(dctx) {
+        throw new TMsgpackError(
+            `No bytes extension defined: obj_type=${dctx._type}`,
+        );
+    }
+
+    value_from_list(dctx) {
+        throw new TMsgpackError(
+            `No list extension defined: obj_type=${dctx._type}`
+        );
+    }
+}
+
+
+
+class Foo {
+    static class_name  = 'Foo'
+    static class_attrs = ['x', 'y']
+    constructor(x, y) { this.x=x; this.y=y; }
+}
+
+class Bar {
+    static class_name = 'Bar'
+    static class_attrs = ['x', 'y', 'yhub']
+    constructor(x, y, yhub) { this.x=x; this.y=y; this.yhub=yhub; }
+}
+
+class TestRouterHub { constructor(id) { this.id=id } }  // This is not encodable
 
 function check_round_trip(values, comment = '') {
     let ok = 0;
@@ -76,6 +128,22 @@ function check_round_trip(values, comment = '') {
     console.log(`ok=${ok} not_ok=${not_ok} ${comment}`);
 }
 
+function check_not_supported(values, codec, comment) {
+    let ok = 0;
+    let notOk = 0;
+
+    for (const value of values) {
+        try {
+            codec.encode(value);
+            notOk++;
+            console.log(`MISSING ERROR: ${value}`);
+        } catch (error) {
+            if (error instanceof TMsgpackError) { ok++ }
+            else                                { throw error }
+        }
+    }
+    console.log(`ok=${ok} notOk=${notOk} ${comment}`);
+}
 // Helper functions
 function range(start, stop) {
     const result = [];
@@ -117,3 +185,5 @@ function deep_equal(a, b) {
     return false;
 }
 
+
+tmsgpack_test()

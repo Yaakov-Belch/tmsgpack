@@ -248,7 +248,7 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 
 
 cdef class DecodeCtx:
-    cdef TMsgpackCodec     codec
+    cdef readonly TMsgpackCodec     codec
     cdef BaseDecodeBuffer  dbuf
     cdef readonly uint64_t _len
     cdef readonly object   _type

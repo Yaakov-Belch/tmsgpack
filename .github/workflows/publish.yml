@@ -25,9 +25,9 @@ jobs:
     - name: Build Python package
       run: |
         cd Python
-        python -m pip install build --sdist
+        python -m pip install build
         rm -rf dist/
-        python -m build
+        python -m build --sdist
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1

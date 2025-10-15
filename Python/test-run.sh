@@ -8,8 +8,8 @@ VERSION=$(node -p "require('../JavaScript/package.json').version")
 echo version: $VERSION
 echo $VERSION > Automatic-Version
 
-cat <<EOF | cat - tmsgpack/src-parts/* > tmsgpack/cython/tmsgpack.pyx
-# THIS FILE IS AUTOMATICALLY CREATED BY THE test-cython-run.sh SCRIPT!
+cat <<EOF | cat - tmsgpack/src-parts/* > tmsgpack/tmsg2pack.pyx
+# THIS FILE IS AUTOMATICALLY CREATED BY THE test-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
 __version__ = "$VERSION"
@@ -18,4 +18,4 @@ EOF
 
 echo "Building and testing..."
 
-./venv/bin/python setup.py build_ext --inplace && python test-cython.py
+./venv/bin/python setup.py build_ext --inplace && python test.py

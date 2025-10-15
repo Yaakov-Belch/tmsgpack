@@ -1,8 +1,8 @@
 from typing import Any, Tuple
 from dataclasses import dataclass
-from tmsgpack.cython.tmsgpack import EncodeBuffer, DecodeBuffer
-from tmsgpack.cython.tmsgpack import ebuf_put_value, dbuf_take_value
-from tmsgpack.cython.tmsgpack import TMsgpackEncodingError, TMsgpackDecodingError
+from tmsgpack.tmsg2pack import EncodeBuffer, DecodeBuffer
+from tmsgpack.tmsg2pack import ebuf_put_value, dbuf_take_value
+from tmsgpack.tmsg2pack import TMsgpackEncodingError, TMsgpackDecodingError
 
 class EncodeDecode:
     def encode(self, value, target=None):

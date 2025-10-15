@@ -3,7 +3,7 @@ from Cython.Build import cythonize
 import glob
 
 # Automatically find all .pyx files in src/
-pyx_files = glob.glob("tmsgpack/cython/*.pyx")
+pyx_files = glob.glob("tmsgpack/*.pyx")
 
 print("Found packages:", find_packages())
 

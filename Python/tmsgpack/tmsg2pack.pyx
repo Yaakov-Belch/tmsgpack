@@ -1,4 +1,4 @@
-# THIS FILE IS AUTOMATICALLY CREATED BY THE test-cython-run.sh SCRIPT!
+# THIS FILE IS AUTOMATICALLY CREATED BY THE test-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
 __version__ = "0.2.3"

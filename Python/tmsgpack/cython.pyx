@@ -152,10 +152,10 @@ cdef class EncodeCtx:
         if self.cache_key is None: raise TMsgpackError('Repeated set_encode_handler')
         self._decompose_value_cache[self.cache_key] = handler
         self.cache_key = None
-        handler.decompose_value(self)
+        handler(self)
 
     cpdef set_dict_encode_handler(self, _type, keys):
-        self.set_encode_handler(DictEncodeHandler(_type, keys))
+        self.set_encode_handler(DictEncodeHandler(_type,keys).decompose_value)
 
 cdef class DictEncodeHandler:
     cdef object _type
@@ -242,7 +242,7 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is list:  ectx._vk(None, None).put_sequence(False, value)
     elif t is dict:  ectx._vk(None, None).put_dict(None, value, codec.sort_keys)
     elif ectx.use_cache and (handler := ectx._decompose_value_cache.get(t, None)):
-        handler.decompose_value(ectx._vk(value, None)); ectx._mark_use(True)
+        handler(ectx._vk(value, None)); ectx._mark_use(True)
     else:
         codec.decompose_value(ectx._vk(value, t)); ectx._mark_use(True)
 
@@ -317,11 +317,11 @@ cdef class DecodeCtx:
         if self._bytes: self._value_from_bytes_cache[self.cache_key] = handler
         else:           self._value_from_list_cache[self.cache_key]  = handler
         self.cache_key = None
-        if self._bytes:  return handler.value_from_bytes(self)
-        else:            return handler.value_from_list(self)
+        return handler(self)
 
     cpdef set_dict_decode_handler(self, constructor, extra_kwargs=None):
-        return self.set_decode_handler(DictDecodeHandler(constructor, extra_kwargs))
+        handler = DictDecodeHandler(constructor, extra_kwargs).value_from_list
+        return self.set_decode_handler(handler)
 
 cdef class DictDecodeHandler:
     cdef object constructor
@@ -375,7 +375,7 @@ cdef dctx_take_value(DecodeCtx dctx):
         if _type is None:  return dctx._ltbk(_len, _type, False, None).take_dict()
 
         if dctx.use_cache and (handler := dctx._value_from_list_cache.get(_type, None)):
-            result = handler.value_from_list(dctx._ltbk(_len, _type, False, _type))
+            result = handler(dctx._ltbk(_len, _type, False, _type))
         else:
             result = codec.value_from_list(dctx._ltbk(_len, _type, False, _type))
         dctx._mark_use(True)
@@ -393,7 +393,7 @@ cdef dctx_take_value(DecodeCtx dctx):
         if _type is True: return dctx._ltbk(_len, _type, True, None).take_bytes()
 
         if dctx.use_cache and (handler := dctx._value_from_bytes_cache.get(_type, None)):
-            result = handler.value_from_bytes(dctx._ltbk(_len, _type, True, _type))
+            result = handler(dctx._ltbk(_len, _type, True, _type))
         else:
             result = codec.value_from_bytes(dctx._ltbk(_len, _type, True, _type))
         dctx._mark_use(True)

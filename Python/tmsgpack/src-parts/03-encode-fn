@@ -84,10 +84,10 @@ cdef class EncodeCtx:
         if self.cache_key is None: raise TMsgpackError('Repeated set_encode_handler')
         self._decompose_value_cache[self.cache_key] = handler
         self.cache_key = None
-        handler.decompose_value(self)
+        handler(self)
 
     cpdef set_dict_encode_handler(self, _type, keys):
-        self.set_encode_handler(DictEncodeHandler(_type, keys))
+        self.set_encode_handler(DictEncodeHandler(_type,keys).decompose_value)
 
 cdef class DictEncodeHandler:
     cdef object _type
@@ -174,7 +174,7 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is list:  ectx._vk(None, None).put_sequence(False, value)
     elif t is dict:  ectx._vk(None, None).put_dict(None, value, codec.sort_keys)
     elif ectx.use_cache and (handler := ectx._decompose_value_cache.get(t, None)):
-        handler.decompose_value(ectx._vk(value, None)); ectx._mark_use(True)
+        handler(ectx._vk(value, None)); ectx._mark_use(True)
     else:
         codec.decompose_value(ectx._vk(value, t)); ectx._mark_use(True)
 

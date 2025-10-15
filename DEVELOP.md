@@ -1,60 +1,30 @@
-## JavaScript
+## Clone, test and publish
 
 ```bash
 # git clone git@github.com:Yaakov-Belch/tmsgpack.git # You need permissions.
 git clone https://github.com/Yaakov-Belch/tmsgpack.git
 
-cd tmsgpack/JavaScript
+cd tmsgpack/
 
-# 1. Install and test
-npm install
-npm test
-
-# 2. Log into npm
-npm login
-npm whoami
-
-# 3. Dry run to verify package contents
-# npm pack                # Creates tarball. No npm login needed
-npm publish --dry-run     # Checks publication readiness.
-
-# 4. Publish when ready
-npm publish
-```
-
-## Python
-
-```bash
-# git clone git@github.com:Yaakov-Belch/tmsgpack.git # You need permissions.
-git clone https://github.com/Yaakov-Belch/tmsgpack.git
-
-cd tmsgpack/Python
-
-# Create a virtual environment and activate it
+# Do this only once -- after cloning:
 python -m venv venv
 source venv/bin/activate
-
-# Install tools
 pip install --upgrade pip
 pip install setuptools Cython build twine
 
-# Run tests -- this compiles sources and fetches __version__ from ../JavaScript
-./test-cython-run.sh
+# Tests:
+(cd JavaScript; npm install; npm test)
+./Python/test-run.sh  # This is needed to update the version number.
 
-rm -rf dist/     # remove old builds
-python -m build  # puts results in dist/
-
-cat MANIFEST.in
-unzip -l dist/tmsgpack-*.whl
-
-# Register at pypi.org if you haven't
-# Connecting to upload.pypi.org
-# twine upload dist/*  # This does not work: Platform incompatible.
-twine upload dist/tmsgpack-*.tar.gz
-
+# Publish:
+git commit -a
+git push
+git tag v0.1.2  # use the correct version number
+git push --tags
+```
 
 # Test in a separate virtual environment
-deactivate
+```bash
 rm -rf   ~/test-tmsgpack
 mkdir -p ~/test-tmsgpack
 cd       ~/test-tmsgpack
@@ -65,9 +35,4 @@ pip install tmsgpack
 python -c "import tmsgpack; print('Version:', tmsgpack.__version__)"
 ```
 
-Publication
-```
-git tag v0.2.4
-git push --tags
-```
 

@@ -16,7 +16,7 @@ cdef class BaseDecodeBuffer:
         """Internal method that returns pointer to n bytes and advances start"""
         cdef int new_start = self.start + n
         if new_start > self.end:
-            raise TMsgpackDecodingError('Not enough input data')
+            raise TMsgpackError('Not enough input data')
         cdef const char* result = <const char*>self.msg + self.start
         self.start = new_start
         return result

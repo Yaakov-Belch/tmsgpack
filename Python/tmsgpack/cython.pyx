@@ -76,6 +76,8 @@ cdef class EncodeCtx:
     cdef object           cache_key
     cdef bint             _used
     cdef dict             _decompose_value_cache
+    cdef readonly bint    sort_keys
+    cdef bint             use_cache
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
         self.codec     = codec
@@ -83,6 +85,8 @@ cdef class EncodeCtx:
         self.value     = None
         self.cache_key = None
         self._used     = True    # Set to False directly before use.
+        self.sort_keys = codec.sort_keys
+        self.use_cache = codec.use_cache
         self._decompose_value_cache = get_cached_dict(codec, '_decompose_value_cache')
 
     cdef _vk(self, value, cache_key):
@@ -93,8 +97,8 @@ cdef class EncodeCtx:
 
     cdef _mark_use(self, bint expect_used):
         if expect_used is not self._used:
-            if expect_used: raise TMsgpackEncodingError('ectx was not used.')
-            else:           raise TMsgpackEncodingError('ectx used twice.')
+            if expect_used: raise TMsgpackError('ectx was not used.')
+            else:           raise TMsgpackError('ectx used twice.')
         self._used = True
         if expect_used: self.value=None; self.cache_key=None
 
@@ -102,7 +106,7 @@ cdef class EncodeCtx:
         cdef BaseEncodeBuffer ebuf = self.ebuf
         cdef uint64_t         _len
         self._mark_use(False)
-        if type(value) is not bytes: raise TMsgpackEncodingError(f'not bytes: {value}')
+        if type(value) is not bytes: raise TMsgpackError(f'not bytes: {value}')
 
         bytes_val = <bytes>value
         _len = <uint64_t>len(bytes_val)
@@ -144,8 +148,32 @@ cdef class EncodeCtx:
             ectx_put_value(self, k)
             ectx_put_value(self, v)
 
-    @property
-    def sort_keys(self): return self.codec.sort_keys
+    cpdef set_encode_handler(self, handler):
+        if self.cache_key is None: raise TMsgpackError('Repeated set_encode_handler')
+        self._decompose_value_cache[self.cache_key] = handler
+        self.cache_key = None
+        handler.decompose_value(self)
+
+    cpdef set_dict_encode_handler(self, _type, keys):
+        self.set_encode_handler(DictEncodeHandler(_type, keys))
+
+cdef class DictEncodeHandler:
+    cdef object _type
+    cdef object keys
+
+    def __cinit__(self, _type, keys):
+        self._type = _type
+        self.keys  = keys
+
+    cpdef decompose_value(self, EncodeCtx ectx):
+        ectx._mark_use(False)
+        _tuple_header(ectx.ebuf, 2 * len(self.keys))
+        ectx_put_value(ectx, self._type)
+
+        value = ectx.value
+        for key in self.keys:
+            ectx_put_value(ectx, key)
+            ectx_put_value(ectx, getattr(value, key))
 
 cdef bint _tuple_header(BaseEncodeBuffer ebuf, uint64_t _len):
     if   _len < 17:      ebuf.put_uint1(<uint8_t>(FixTuple0 + _len))
@@ -168,6 +196,7 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     cdef bint bool_val
 
     cdef object t = type(value)
+    cdef object handler
 
     if t is int:
         # Cast to C int64_t for efficient comparisons and arithmetic
@@ -204,7 +233,7 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
         bool_val = <bint>value
         if bool_val is True:  return ebuf.put_uint1(ConstValTrue)
         if bool_val is False: return ebuf.put_uint1(ConstValFalse)
-        raise TMsgpackEncodingError(f'Illegal boolean value: {value}')
+        raise TMsgpackError(f'Illegal boolean value: {value}')
 
     if t is NoneType: return ebuf.put_uint1(ConstValNone)
 
@@ -212,11 +241,11 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is tuple: ectx._vk(None, None).put_sequence(True, value)
     elif t is list:  ectx._vk(None, None).put_sequence(False, value)
     elif t is dict:  ectx._vk(None, None).put_dict(None, value, codec.sort_keys)
+    elif ectx.use_cache and (handler := ectx._decompose_value_cache.get(t, None)):
+        handler.decompose_value(ectx._vk(value, None)); ectx._mark_use(True)
     else:
+        codec.decompose_value(ectx._vk(value, t)); ectx._mark_use(True)
 
-
-
-        codec.decompose_value(ectx._vk(value, None)); ectx._mark_use(True)
 
 cdef class DecodeCtx:
     cdef TMsgpackCodec     codec
@@ -228,6 +257,7 @@ cdef class DecodeCtx:
     cdef bint              _used
     cdef dict             _value_from_list_cache
     cdef dict             _value_from_bytes_cache
+    cdef bint             use_cache
 
     def __cinit__(self, TMsgpackCodec codec, BaseDecodeBuffer dbuf):
         self.codec     = codec
@@ -237,6 +267,7 @@ cdef class DecodeCtx:
         self._bytes    = False
         self.cache_key = None
         self._used     = True    # Set to False direclty before use.
+        self.use_cache = codec.use_cache
         self._value_from_list_cache  = get_cached_dict(codec, '_value_from_list_cache')
         self._value_from_bytes_cache = get_cached_dict(codec, '_value_from_bytes_cache')
 
@@ -250,13 +281,13 @@ cdef class DecodeCtx:
 
     cdef _mark_use(self, bint expect_used):
         if expect_used is not self._used:
-            if expect_used: raise TMsgpackDecodingError('dctx was not used.')
-            else:           raise TMsgpackDecodingError('dctx used twice.')
+            if expect_used: raise TMsgpackError('dctx was not used.')
+            else:           raise TMsgpackError('dctx used twice.')
         self._used = True
         if expect_used: self._len=0; self._type=self.cache_key=None; self._bytes=False;
 
     cpdef list take_list(self):
-        if self._bytes: raise TMsgpackDecodingError('take_list called for bytes')
+        if self._bytes: raise TMsgpackError('take_list called for bytes')
         self._mark_use(False)
 
         _list = []
@@ -266,7 +297,7 @@ cdef class DecodeCtx:
     cpdef tuple take_tuple(self): return tuple(self.take_list())
 
     cpdef dict take_dict(self):
-        if self._bytes: raise TMsgpackDecodingError('take_dict called for bytes')
+        if self._bytes: raise TMsgpackError('take_dict called for bytes')
         self._mark_use(False)
 
         _dict = {}
@@ -277,9 +308,33 @@ cdef class DecodeCtx:
         return _dict
 
     cpdef bytes take_bytes(self):
-        if not self._bytes: raise TMsgpackDecodingError('take_bytes called for list')
+        if not self._bytes: raise TMsgpackError('take_bytes called for list')
         self._mark_use(False)
         return self.dbuf.take_bytes(self._len)
+
+    cpdef set_decode_handler(self, handler):
+        if self.cache_key is None: raise TMsgpackError('Repeated set_decode_handler')
+        if self._bytes: self._value_from_bytes_cache[self.cache_key] = handler
+        else:           self._value_from_list_cache[self.cache_key]  = handler
+        self.cache_key = None
+        if self._bytes:  return handler.value_from_bytes(self)
+        else:            return handler.value_from_list(self)
+
+    cpdef set_dict_decode_handler(self, constructor, extra_kwargs=None):
+        return self.set_decode_handler(DictDecodeHandler(constructor, extra_kwargs))
+
+cdef class DictDecodeHandler:
+    cdef object constructor
+    cdef object extra_kwargs
+
+    def __cinit__(self, constructor, extra_kwargs):
+        self.constructor  = constructor
+        self.extra_kwargs = extra_kwargs
+
+    def value_from_list(self, ectx):
+        kwargs = ectx.take_dict()
+        if self.extra_kwargs: return self.constructor(**kwargs, **self.extra_kwargs)
+        else:                 return self.constructor(**kwargs)
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""
@@ -294,7 +349,7 @@ cdef dctx_take_value(DecodeCtx dctx):
     cdef uint8_t  opcode = dbuf.take_uint1()
 
     if not (0 <= opcode < ui1_max):
-        raise TMsgpackDecodingError(f'Opcode out of range 0-255: {opcode}')
+        raise TMsgpackError(f'Opcode out of range 0-255: {opcode}')
 
     # Note: Reverse stacked ranges.
     # Every range is bounded above by the range right before it.
@@ -303,7 +358,7 @@ cdef dctx_take_value(DecodeCtx dctx):
 
     if ConstNegInt <= opcode: return <int64_t>(opcode - ui1_max)  # negative integer
 
-    if NotUsed <= opcode: raise TMsgpackDecodingError(f'Undefined opcode: {opcode}')
+    if NotUsed <= opcode: raise TMsgpackError(f'Undefined opcode: {opcode}')
     if ConstValStart <= opcode: return _map_consts[opcode - ConstValStart]
 
     if FixTuple0 <= opcode:
@@ -318,7 +373,11 @@ cdef dctx_take_value(DecodeCtx dctx):
         if _type is True:  return dctx._ltbk(_len, _type, False, None).take_tuple()
         if _type is False: return dctx._ltbk(_len, _type, False, None).take_list()
         if _type is None:  return dctx._ltbk(_len, _type, False, None).take_dict()
-        result = codec.value_from_list(dctx._ltbk(_len, _type, False, None))
+
+        if dctx.use_cache and (handler := dctx._value_from_list_cache.get(_type, None)):
+            result = handler.value_from_list(dctx._ltbk(_len, _type, False, _type))
+        else:
+            result = codec.value_from_list(dctx._ltbk(_len, _type, False, _type))
         dctx._mark_use(True)
         return result
 
@@ -332,7 +391,11 @@ cdef dctx_take_value(DecodeCtx dctx):
         _type = dbuf_take_value(codec, dbuf)
 
         if _type is True: return dctx._ltbk(_len, _type, True, None).take_bytes()
-        result = codec.value_from_bytes(dctx._ltbk(_len, _type, True, None))
+
+        if dctx.use_cache and (handler := dctx._value_from_bytes_cache.get(_type, None)):
+            result = handler.value_from_bytes(dctx._ltbk(_len, _type, True, _type))
+        else:
+            result = codec.value_from_bytes(dctx._ltbk(_len, _type, True, _type))
         dctx._mark_use(True)
         return result
 
@@ -439,7 +502,7 @@ cdef class BaseDecodeBuffer:
         """Internal method that returns pointer to n bytes and advances start"""
         cdef int new_start = self.start + n
         if new_start > self.end:
-            raise TMsgpackDecodingError('Not enough input data')
+            raise TMsgpackError('Not enough input data')
         cdef const char* result = <const char*>self.msg + self.start
         self.start = new_start
         return result
@@ -563,9 +626,9 @@ cdef class SafeDecodeBuffer(BaseDecodeBuffer):
 # Choose the appropriate implementation based on platform endianness
 EncodeBuffer = BaseEncodeBuffer if sys.byteorder == 'little' else SafeEncodeBuffer
 DecodeBuffer = BaseDecodeBuffer if sys.byteorder == 'little' else SafeDecodeBuffer
-class TMsgpackDecodingError(Exception): pass
-class TMsgpackEncodingError(Exception): pass
+class TMsgpackError(Exception): pass
 
 cdef get_cached_dict(codec, attr):
     if attr not in codec.__dict__: codec.__dict__[attr] = {}
     return codec.__dict__[attr]
+

@@ -1,6 +1,6 @@
-class TMsgpackDecodingError(Exception): pass
-class TMsgpackEncodingError(Exception): pass
+class TMsgpackError(Exception): pass
 
 cdef get_cached_dict(codec, attr):
     if attr not in codec.__dict__: codec.__dict__[attr] = {}
     return codec.__dict__[attr]
+

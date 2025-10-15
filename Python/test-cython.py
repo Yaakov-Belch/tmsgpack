@@ -30,7 +30,9 @@ def main():
         1,2,3,4, {'a':'hello', 'b': ['world', 5,6,7]},
     ]], 'nested value')
 
-    check_round_trip([Foo(1,2)], codec=MyCodec())
+    yhub=TestRouterHub(id=111); codec=MyCodec(yhub=yhub)
+    check_not_supported([yhub], codec=codec, comment='yhub not encodable')
+    check_round_trip([Foo(1,2), Bar(11,22,yhub=yhub)], codec=codec)
 
 def check_round_trip(values, comment='', codec=basic_codec):
     ok = not_ok = 0
@@ -47,6 +49,12 @@ def check_round_trip(values, comment='', codec=basic_codec):
 
     print(f'{ok=} {not_ok=} {comment}')
 
+def check_not_supported(values, codec, comment):
+    ok = not_ok = 0
+    for value in values:
+        try: codec.encode(value); not_ok+=1; print(f'MISSING ERROR: {value}')
+        except TMsgpackEncodingError: ok += 1
+    print(f'{ok=} {not_ok=} {comment}')
 
 from tmsgpack import EncodeDecode, TMsgpackEncodingError, TMsgpackDecodingError
 from dataclasses import dataclass
@@ -54,6 +62,8 @@ from dataclasses import dataclass
 @dataclass
 class MyCodec(EncodeDecode):
     sort_keys = True
+    yhub: 'TestRouterHub'
+
     def prep_encode(self, value, target): return [None, self, value]
 
     def decode_codec(self, codec_type, source):
@@ -78,6 +88,15 @@ class Foo:
     x: int
     y: int
 
+@dataclass
+class Bar:
+    x: int
+    y: int
+    yhub: 'TestRouterHub'
+
+@dataclass
+class TestRouterHub:  # This is not encodable
+    id: int
 
 if __name__ == '__main__':
     main()

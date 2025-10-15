@@ -1,13 +1,7 @@
-export class TMsgpackEncodingError extends Error {
+export class TMsgpackError extends Error {
     constructor(message) {
         super(message);
-        this.name = 'TMsgpackEncodingError';
+        this.name = 'TMsgpackError';
     }
 }
 
-export class TMsgpackDecodingError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = 'TMsgpackDecodingError';
-    }
-}

@@ -1,4 +1,4 @@
-import { TMsgpackEncodingError, TMsgpackDecodingError } from "./exceptions.js"
+import { TMsgpackError } from "./exceptions.js"
 
 export class EncodeBuffer {
     constructor(initialSize, maxByteLength) {
@@ -77,7 +77,7 @@ export class DecodeBuffer {
         this.pos += n;
 
         if (this.pos > this.end) {
-            throw new TMsgpackDecodingError('Not enough input data');
+            throw new TMsgpackError('Not enough input data');
         }
 
         if(method === 'rdUint8Array') {

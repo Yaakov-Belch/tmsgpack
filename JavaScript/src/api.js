@@ -1,6 +1,6 @@
 import { EncodeBuffer, DecodeBuffer }      from "./buffers.js"
 import { ebuf_put_value, dbuf_take_value } from "./engine.js"
-import { TMsgpackEncodingError, TMsgpackDecodingError } from "./exceptions.js"
+import { TMsgpackError } from "./exceptions.js"
 
 export class EncodeDecode {
     encode(value, target = null) {
@@ -34,21 +34,21 @@ export class BasicCodec extends EncodeDecode {
 
     decode_codec(codec_type, source) {
         if (codec_type === null) return this;
-        throw new TMsgpackDecodingError(`Unsupported codec_type: ${codec_type}`);
+        throw new TMsgpackError(`Unsupported codec_type: ${codec_type}`);
     }
 
     decompose_value(value) {
-        throw new TMsgpackEncodingError(`Unsupported value: ${value}`);
+        throw new TMsgpackError(`Unsupported value: ${value}`);
     }
 
     value_from_bytes(obj_type, data) {
-        throw new TMsgpackDecodingError(
+        throw new TMsgpackError(
             `No bytes extension defined: obj_type=${obj_type} data=${data}`,
         );
     }
 
     value_from_list(obj_type, values) {
-        throw new TMsgpackDecodingError(
+        throw new TMsgpackError(
             `No list extension defined: obj_type=${obj_type} values=${values}`
         );
     }

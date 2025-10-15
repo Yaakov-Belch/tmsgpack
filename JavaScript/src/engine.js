@@ -1,4 +1,4 @@
-import { TMsgpackEncodingError, TMsgpackDecodingError } from "./exceptions.js"
+import { TMsgpackError } from "./exceptions.js"
 
 const i1_max = 2**7;
 const i2_max = 2**15;
@@ -55,8 +55,8 @@ class EncodeCtx {
 
     _mark_use(expect_used) {
         if(expect_used !== this._used) {
-            if(expect_used) { throw new TMsgpackEncodingError('ectx was not used.') }
-            else            { throw new TMsgpackEncodingError('ectx used twice.')   }
+            if(expect_used) { throw new TMsgpackError('ectx was not used.') }
+            else            { throw new TMsgpackError('ectx used twice.')   }
         }
         this._used = true;
         if(expect_used) {this.value = null}
@@ -67,7 +67,7 @@ class EncodeCtx {
         const ebuf = this.ebuf;
 
         if (!(value instanceof Uint8Array)) {
-            throw new TMsgpackEncodingError(`not Uint8Array: ${value}`);
+            throw new TMsgpackError(`not Uint8Array: ${value}`);
         }
 
         const _len = value.length;
@@ -205,8 +205,8 @@ class DecodeCtx {
 
     _mark_use(expect_used) {
         if(expect_used !== this._used) {
-            if(expect_used) { throw new TMsgpackDecodingError('dctx was not used.') }
-            else            { throw new TMsgpackDecodingError('dctx used twice.')   }
+            if(expect_used) { throw new TMsgpackError('dctx was not used.') }
+            else            { throw new TMsgpackError('dctx used twice.')   }
         }
         this._used = true;
         if(expect_used) {this._len=0; this._type=null; this._bytes=false}
@@ -214,7 +214,7 @@ class DecodeCtx {
 
     take_list() {
         this._mark_use(false)
-        if(this._bytes) { throw TMsgpackDecodingError('take_list called for bytes') }
+        if(this._bytes) { throw TMsgpackError('take_list called for bytes') }
 
         const _list = [];
         for (let i = 0; i < this._len; i++) { _list.push(dctx_take_value(this)); }
@@ -223,7 +223,7 @@ class DecodeCtx {
 
     take_dict() {
         this._mark_use(false)
-        if(this._bytes) { throw TMsgpackDecodingError('take_dict called for bytes') }
+        if(this._bytes) { throw TMsgpackError('take_dict called for bytes') }
 
         const result = {};
         for (let i = 0; i < this._len; i += 2) {
@@ -236,7 +236,7 @@ class DecodeCtx {
 
     take_bytes() {
         this._mark_use(false)
-        if(!this._bytes) { throw TMsgpackDecodingError('take_bytes called for list') }
+        if(!this._bytes) { throw TMsgpackError('take_bytes called for list') }
         return this.dbuf.take_bytes(this._len)
     }
 }
@@ -250,7 +250,7 @@ function dctx_take_value(dctx) {
     const opcode = dbuf.take_uint1();
 
     if (!(0 <= opcode && opcode < ui1_max)) {
-        throw new TMsgpackDecodingError(`Opcode out of range 0-255: ${opcode}`);
+        throw new TMsgpackError(`Opcode out of range 0-255: ${opcode}`);
     }
 
     // Note: Reverse stacked ranges.
@@ -260,7 +260,7 @@ function dctx_take_value(dctx) {
 
     if (ConstNegInt <= opcode)   { return opcode - ui1_max; } // negative integer
     if (NotUsed <= opcode) {
-        throw new TMsgpackDecodingError(`Undefined opcode: ${opcode}`);
+        throw new TMsgpackError(`Undefined opcode: ${opcode}`);
     }
     if (ConstValStart <= opcode) { return _map_consts[opcode - ConstValStart]; }
 
@@ -317,7 +317,7 @@ function dctx_take_value(dctx) {
 
     if (0 <= opcode) return opcode; // const integer
 
-    throw new TMsgpackDecodingError(`Unhandled opcode: ${opcode}`);
+    throw new TMsgpackError(`Unhandled opcode: ${opcode}`);
 }
 
 function list_to_dict(t) {

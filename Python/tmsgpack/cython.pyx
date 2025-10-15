@@ -1,7 +1,7 @@
 # THIS FILE IS AUTOMATICALLY CREATED BY THE test-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
-__version__ = "0.2.3"
+__version__ = "0.2.5"
 
 from libc.stdint cimport int8_t, int16_t, int32_t, int64_t
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t

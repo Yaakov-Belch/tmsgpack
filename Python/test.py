@@ -58,7 +58,7 @@ def check_not_supported(values, codec, comment):
     print(f'{ok=} {not_ok=} {comment}')
 
 from tmsgpack import EncodeDecode, TMsgpackError
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Sequence
 from functools import cached_property
 import inspect
@@ -66,10 +66,12 @@ import inspect
 @dataclass
 class MyCodec(EncodeDecode):
     sort_keys = True
-    use_cache = True
 
     yhub: 'TestRouterHub'
     types: Sequence
+
+    encode_cache: dict = field(repr=False, default_factory=dict)
+    decode_cache: dict = field(repr=False, default_factory=dict)
 
     @cached_property
     def constructors(self): return {t.__name__:t for t in self.types}
@@ -81,20 +83,33 @@ class MyCodec(EncodeDecode):
         raise TMsgpackError(f'Unsupported codec_type: {codec_type}')
 
     def decompose_value(self, ectx):
-        type_name   = self.type_to_name(type(ectx.value))
-        constructor = self.name_to_constructor(type_name)
-        args        = self.constructor_to_args_without_yhub(constructor)
-        ectx.set_dict_encode_handler(type_name, args)
+        t = type(ectx.value)
+        if t not in self.encode_cache:
+            type_name   = self.type_to_name(t)
+            constructor = self.name_to_constructor(type_name)
+            args        = self.constructor_to_args_without_yhub(constructor)
+
+            def encode_handler(ectx):
+                value = ectx.value
+                ectx.put_dict(type_name, {a:getattr(value, a) for a in args})
+            self.encode_cache[t] = encode_handler
+        self.encode_cache[t](ectx)
 
     def value_from_bytes(self, dctx):
         raise TMsgpackError(f'No bytes extension defined: {obj_type=} {data=}')
 
     def value_from_list(self, dctx):
-        constructor = self.name_to_constructor(dctx._type)
-        with_yhub   = 'yhub' in self.constructor_to_args(constructor)
-        if with_yhub: extra_kwargs = {'yhub': dctx.codec.yhub}
-        else:         extra_kwargs = None
-        return dctx.set_dict_decode_handler(constructor, extra_kwargs)
+        _type = dctx._type
+        if _type not in self.decode_cache:
+            constructor = self.name_to_constructor(_type)
+            with_yhub   = 'yhub' in self.constructor_to_args(constructor)
+            yhub        = dctx.codec.yhub
+
+            def decode_handler(dctx):
+                if with_yhub: return constructor(**dctx.take_dict(), yhub=yhub)
+                else:         return constructor(**dctx.take_dict())
+            self.decode_cache[_type] = decode_handler
+        return self.decode_cache[_type](dctx)
 
     def type_to_name(self, _type): return _type.__name__
     def name_to_constructor(self, name):

@@ -1,33 +1,24 @@
 cdef class DecodeCtx:
-    cdef readonly TMsgpackCodec     codec
-    cdef BaseDecodeBuffer  dbuf
-    cdef readonly uint64_t _len
-    cdef readonly object   _type
-    cdef readonly bint     _bytes
-    cdef object           cache_key
-    cdef bint              _used
-    cdef dict             _value_from_list_cache
-    cdef dict             _value_from_bytes_cache
-    cdef bint             use_cache
+    cdef readonly TMsgpackCodec  codec
+    cdef BaseDecodeBuffer        dbuf
+    cdef readonly uint64_t       _len
+    cdef readonly object         _type
+    cdef readonly bint           _bytes
+    cdef bint                    _used
 
     def __cinit__(self, TMsgpackCodec codec, BaseDecodeBuffer dbuf):
-        self.codec     = codec
-        self.dbuf      = dbuf
-        self._len      = 0
-        self._type     = None
-        self._bytes    = False
-        self.cache_key = None
-        self._used     = True    # Set to False direclty before use.
-        self.use_cache = codec.use_cache
-        self._value_from_list_cache  = get_cached_dict(codec, '_value_from_list_cache')
-        self._value_from_bytes_cache = get_cached_dict(codec, '_value_from_bytes_cache')
+        self.codec  = codec
+        self.dbuf   = dbuf
+        self._len   = 0
+        self._type  = None
+        self._bytes = False
+        self._used  = True    # Set to False directly before use.
 
-    cdef _ltbk(self, _len, _type, _bytes, cache_key):
-        self._len      = _len
-        self._type     = _type
-        self._bytes    = _bytes
-        self.cache_key = cache_key
-        self._used     = False
+    cdef _ltb(self, _len, _type, _bytes):
+        self._len   = _len
+        self._type  = _type
+        self._used  = False
+        self._bytes = _bytes
         return self
 
     cdef _mark_use(self, bint expect_used):
@@ -35,7 +26,7 @@ cdef class DecodeCtx:
             if expect_used: raise TMsgpackError('dctx was not used.')
             else:           raise TMsgpackError('dctx used twice.')
         self._used = True
-        if expect_used: self._len=0; self._type=self.cache_key=None; self._bytes=False;
+        if expect_used: self._len=0; self._type=None; self._bytes=False
 
     cpdef list take_list(self):
         if self._bytes: raise TMsgpackError('take_list called for bytes')
@@ -62,30 +53,6 @@ cdef class DecodeCtx:
         if not self._bytes: raise TMsgpackError('take_bytes called for list')
         self._mark_use(False)
         return self.dbuf.take_bytes(self._len)
-
-    cpdef set_decode_handler(self, handler):
-        if self.cache_key is None: raise TMsgpackError('Repeated set_decode_handler')
-        if self._bytes: self._value_from_bytes_cache[self.cache_key] = handler
-        else:           self._value_from_list_cache[self.cache_key]  = handler
-        self.cache_key = None
-        return handler(self)
-
-    cpdef set_dict_decode_handler(self, constructor, extra_kwargs=None):
-        handler = DictDecodeHandler(constructor, extra_kwargs).value_from_list
-        return self.set_decode_handler(handler)
-
-cdef class DictDecodeHandler:
-    cdef object constructor
-    cdef object extra_kwargs
-
-    def __cinit__(self, constructor, extra_kwargs):
-        self.constructor  = constructor
-        self.extra_kwargs = extra_kwargs
-
-    def value_from_list(self, ectx):
-        kwargs = ectx.take_dict()
-        if self.extra_kwargs: return self.constructor(**kwargs, **self.extra_kwargs)
-        else:                 return self.constructor(**kwargs)
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""
@@ -121,14 +88,10 @@ cdef dctx_take_value(DecodeCtx dctx):
 
         _type = dbuf_take_value(codec, dbuf)
 
-        if _type is True:  return dctx._ltbk(_len, _type, False, None).take_tuple()
-        if _type is False: return dctx._ltbk(_len, _type, False, None).take_list()
-        if _type is None:  return dctx._ltbk(_len, _type, False, None).take_dict()
-
-        if dctx.use_cache and (handler := dctx._value_from_list_cache.get(_type, None)):
-            result = handler(dctx._ltbk(_len, _type, False, _type))
-        else:
-            result = codec.value_from_list(dctx._ltbk(_len, _type, False, _type))
+        if _type is True:  return dctx._ltb(_len, _type, False).take_tuple()
+        if _type is False: return dctx._ltb(_len, _type, False).take_list()
+        if _type is None:  return dctx._ltb(_len, _type, False).take_dict()
+        result = codec.value_from_list(dctx._ltb(_len, _type, False))
         dctx._mark_use(True)
         return result
 
@@ -141,12 +104,8 @@ cdef dctx_take_value(DecodeCtx dctx):
 
         _type = dbuf_take_value(codec, dbuf)
 
-        if _type is True: return dctx._ltbk(_len, _type, True, None).take_bytes()
-
-        if dctx.use_cache and (handler := dctx._value_from_bytes_cache.get(_type, None)):
-            result = handler(dctx._ltbk(_len, _type, True, _type))
-        else:
-            result = codec.value_from_bytes(dctx._ltbk(_len, _type, True, _type))
+        if _type is True: return dctx._ltb(_len, _type, True).take_bytes()
+        result = codec.value_from_bytes(dctx._ltb(_len, _type, True))
         dctx._mark_use(True)
         return result
 

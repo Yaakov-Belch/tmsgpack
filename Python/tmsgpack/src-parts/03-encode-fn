@@ -5,26 +5,19 @@ cdef class EncodeCtx:
     cdef TMsgpackCodec    codec
     cdef BaseEncodeBuffer ebuf
     cdef readonly object  value
-    cdef object           cache_key
     cdef bint             _used
-    cdef dict             _decompose_value_cache
     cdef readonly bint    sort_keys
-    cdef bint             use_cache
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
         self.codec     = codec
         self.ebuf      = ebuf
         self.value     = None
-        self.cache_key = None
         self._used     = True    # Set to False directly before use.
         self.sort_keys = codec.sort_keys
-        self.use_cache = codec.use_cache
-        self._decompose_value_cache = get_cached_dict(codec, '_decompose_value_cache')
 
-    cdef _vk(self, value, cache_key):
-        self.value     = value
-        self.cache_key = cache_key
-        self._used     = False
+    cdef _v(self, value):
+        self.value = value
+        self._used = False
         return self
 
     cdef _mark_use(self, bint expect_used):
@@ -32,7 +25,7 @@ cdef class EncodeCtx:
             if expect_used: raise TMsgpackError('ectx was not used.')
             else:           raise TMsgpackError('ectx used twice.')
         self._used = True
-        if expect_used: self.value=None; self.cache_key=None
+        if expect_used: self.value = None
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf
@@ -80,33 +73,6 @@ cdef class EncodeCtx:
             ectx_put_value(self, k)
             ectx_put_value(self, v)
 
-    cpdef set_encode_handler(self, handler):
-        if self.cache_key is None: raise TMsgpackError('Repeated set_encode_handler')
-        self._decompose_value_cache[self.cache_key] = handler
-        self.cache_key = None
-        handler(self)
-
-    cpdef set_dict_encode_handler(self, _type, keys):
-        self.set_encode_handler(DictEncodeHandler(_type,keys).decompose_value)
-
-cdef class DictEncodeHandler:
-    cdef object _type
-    cdef object keys
-
-    def __cinit__(self, _type, keys):
-        self._type = _type
-        self.keys  = keys
-
-    cpdef decompose_value(self, EncodeCtx ectx):
-        ectx._mark_use(False)
-        _tuple_header(ectx.ebuf, 2 * len(self.keys))
-        ectx_put_value(ectx, self._type)
-
-        value = ectx.value
-        for key in self.keys:
-            ectx_put_value(ectx, key)
-            ectx_put_value(ectx, getattr(value, key))
-
 cdef bint _tuple_header(BaseEncodeBuffer ebuf, uint64_t _len):
     if   _len < 17:      ebuf.put_uint1(<uint8_t>(FixTuple0 + _len))
     elif _len < ui1_max: ebuf.put_uint1(VarTuple1).put_uint1(<uint8_t>_len)
@@ -128,7 +94,6 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     cdef bint bool_val
 
     cdef object t = type(value)
-    cdef object handler
 
     if t is int:
         # Cast to C int64_t for efficient comparisons and arithmetic
@@ -169,13 +134,9 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
 
     if t is NoneType: return ebuf.put_uint1(ConstValNone)
 
-    if   t is bytes: ectx._vk(None, None).put_bytes(True, value)
-    elif t is tuple: ectx._vk(None, None).put_sequence(True, value)
-    elif t is list:  ectx._vk(None, None).put_sequence(False, value)
-    elif t is dict:  ectx._vk(None, None).put_dict(None, value, codec.sort_keys)
-    elif ectx.use_cache and (handler := ectx._decompose_value_cache.get(t, None)):
-        handler(ectx._vk(value, None)); ectx._mark_use(True)
-    else:
-        codec.decompose_value(ectx._vk(value, t)); ectx._mark_use(True)
-
+    if   t is bytes: ectx._v(None).put_bytes(True, value)
+    elif t is tuple: ectx._v(None).put_sequence(True, value)
+    elif t is list:  ectx._v(None).put_sequence(False, value)
+    elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
+    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
 

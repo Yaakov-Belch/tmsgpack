@@ -1,4 +1,9 @@
 cdef class DecodeCtx:
+
+    # Warning: This object is mutable and shared.
+    # The values self._len, self._type, self._bytes change whenever new values are read.
+    # Copy early and use the copies!
+
     cdef readonly TMsgpackCodec  codec
     cdef BaseDecodeBuffer        dbuf
     cdef readonly uint64_t       _len

@@ -44,6 +44,11 @@ const min_ConstNegInt = ConstNegInt - ui1_max; // This is -64
 
 class EncodeCtx {
     constructor(codec, ebuf) {
+
+        // Warning: This object is mutable and shared.
+        // The this.value changes whenever new values are written.
+        // Copy early and use the copy.
+
         this.codec     = codec;
         this.ebuf      = ebuf;
         this.value     = null;
@@ -191,6 +196,11 @@ function ectx_put_value(ectx, value) {
 
 class DecodeCtx {
     constructor(codec, dbuf) {
+
+        // Warning: This object is mutable and shared.
+        // The values this._len, this._type, this._bytes change whenever new values are read.
+        // Copy early and use the copies!
+
         this.codec  = codec;
         this.dbuf   = dbuf;
         this._len   = 0;

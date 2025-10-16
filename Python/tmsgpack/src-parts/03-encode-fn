@@ -2,6 +2,11 @@
 ctypedef object TMsgpackCodec
 
 cdef class EncodeCtx:
+
+    # Warning: This object is mutable and shared.
+    # The self.value changes whenever new values are written.
+    # Copy early and use the copy.
+
     cdef readonly TMsgpackCodec codec
     cdef BaseEncodeBuffer       ebuf
     cdef readonly object        value

@@ -239,6 +239,12 @@ class DecodeCtx {
         if(!this._bytes) { throw new TMsgpackError('take_bytes called for list') }
         return this.dbuf.rd_bytes(this._len)
     }
+
+    take_str() {
+        this._mark_use(false)
+        if(!this._bytes) { throw new TMsgpackError('take_str called for list') }
+        return this.dbuf.rd_str(this._len)
+    }
 }
 
 export function dbuf_take_value(codec, dbuf) {

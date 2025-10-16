@@ -1,7 +1,7 @@
 # THIS FILE IS AUTOMATICALLY CREATED BY THE test-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
-__version__ = "0.2.15"
+__version__ = "0.2.16"
 
 from libc.stdint cimport int8_t, int16_t, int32_t, int64_t
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
@@ -263,6 +263,11 @@ cdef class DecodeCtx:
         if not self._bytes: raise TMsgpackError('take_bytes called for list')
         self._mark_use(False)
         return self.dbuf.rd_bytes(self._len)
+
+    cpdef str take_str(self):
+        if not self._bytes: raise TMsgpackError('take_str called for list')
+        self._mark_use(False)
+        return self.dbuf.rd_str(self._len)
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""

@@ -54,6 +54,11 @@ cdef class DecodeCtx:
         self._mark_use(False)
         return self.dbuf.rd_bytes(self._len)
 
+    cpdef str take_str(self):
+        if not self._bytes: raise TMsgpackError('take_str called for list')
+        self._mark_use(False)
+        return self.dbuf.rd_str(self._len)
+
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""
     return dctx_take_value(DecodeCtx(codec, dbuf))

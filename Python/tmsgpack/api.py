@@ -38,11 +38,11 @@ class BasicCodec(EncodeDecode):
     def decompose_value(self, ectx):
         raise TMsgpackError(f'Unsupported value: {ectx.value}')
 
-    def value_from_bytes(self, obj_type, data: bytes):
-        raise TMsgpackError(f'No bytes extension defined: {obj_type=} {data=}')
+    def value_from_bytes(self, dctx):
+        raise TMsgpackError(f'No bytes extension defined: {dctx._type}')
 
-    def value_from_list(self, obj_type, values: list):
-        raise TMsgpackError(f'No tuple extension defined: {obj_type=} {values=}')
+    def value_from_list(self, dctx):
+        raise TMsgpackError(f'No tuple extension defined: {dctx._type}')
 
 
 basic_codec = BasicCodec()

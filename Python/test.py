@@ -92,7 +92,7 @@ class MyCodec(EncodeDecode):
         self.encode_cache[t](ectx)
 
     def value_from_bytes(self, dctx):
-        raise TMsgpackError(f'No bytes extension defined: {obj_type=} {data=}')
+        raise TMsgpackError(f'No bytes extension defined: {dctx._type}')
 
     def value_from_list(self, dctx):
         _type = dctx._type

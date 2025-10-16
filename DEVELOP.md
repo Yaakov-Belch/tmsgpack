@@ -18,8 +18,8 @@ pip install setuptools Cython build twine
 
 # Publish:
 git commit -a
-git push
 git tag v0.1.2  # use the correct version number
+git push
 git push --tags
 ```
 

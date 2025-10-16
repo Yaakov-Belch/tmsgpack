@@ -2,11 +2,11 @@
 ctypedef object TMsgpackCodec
 
 cdef class EncodeCtx:
-    cdef TMsgpackCodec    codec
-    cdef BaseEncodeBuffer ebuf
-    cdef readonly object  value
-    cdef bint             _used
-    cdef readonly bint    sort_keys
+    cdef readonly TMsgpackCodec codec
+    cdef BaseEncodeBuffer       ebuf
+    cdef readonly object        value
+    cdef bint                   _used
+    cdef readonly bint          sort_keys
 
     def __cinit__(self, TMsgpackCodec codec, BaseEncodeBuffer ebuf):
         self.codec     = codec

@@ -71,20 +71,20 @@ class EncodeCtx {
         }
 
         const _len = value.length;
-        if (_len === 0)          ebuf.put_uint1(FixBytes0);
-        else if (_len === 1)     ebuf.put_uint1(FixBytes1);
-        else if (_len === 2)     ebuf.put_uint1(FixBytes2);
-        else if (_len === 4)     ebuf.put_uint1(FixBytes4);
-        else if (_len === 8)     ebuf.put_uint1(FixBytes8);
-        else if (_len === 16)    ebuf.put_uint1(FixBytes16);
-        else if (_len === 20)    ebuf.put_uint1(FixBytes20);
-        else if (_len === 32)    ebuf.put_uint1(FixBytes32);
-        else if (_len < ui1_max) ebuf.put_uint1(VarBytes1).put_uint1(_len);
-        else if (_len < ui2_max) ebuf.put_uint1(VarBytes2).put_uint2(_len);
-        else                     ebuf.put_uint1(VarBytes8).put_uint8(_len);
+        if (_len === 0)          ebuf.wr_uint1(FixBytes0);
+        else if (_len === 1)     ebuf.wr_uint1(FixBytes1);
+        else if (_len === 2)     ebuf.wr_uint1(FixBytes2);
+        else if (_len === 4)     ebuf.wr_uint1(FixBytes4);
+        else if (_len === 8)     ebuf.wr_uint1(FixBytes8);
+        else if (_len === 16)    ebuf.wr_uint1(FixBytes16);
+        else if (_len === 20)    ebuf.wr_uint1(FixBytes20);
+        else if (_len === 32)    ebuf.wr_uint1(FixBytes32);
+        else if (_len < ui1_max) ebuf.wr_uint1(VarBytes1).wr_uint1(_len);
+        else if (_len < ui2_max) ebuf.wr_uint1(VarBytes2).wr_uint2(_len);
+        else                     ebuf.wr_uint1(VarBytes8).wr_uint8(_len);
 
         ectx_put_value(this, _type);
-        return ebuf.put_bytes(value);
+        return ebuf.wr_bytes(value);
     }
 
     put_sequence(_type, value) {
@@ -115,10 +115,10 @@ class EncodeCtx {
 }
 
 function _list_header(ebuf, _len) {
-    if      (_len < 17)      { ebuf.put_uint1(FixTuple0 + _len);          }
-    else if (_len < ui1_max) { ebuf.put_uint1(VarTuple1).put_uint1(_len); }
-    else if (_len < ui2_max) { ebuf.put_uint1(VarTuple2).put_uint2(_len); }
-    else                     { ebuf.put_uint1(VarTuple8).put_uint8(_len); }
+    if      (_len < 17)      { ebuf.wr_uint1(FixTuple0 + _len);          }
+    else if (_len < ui1_max) { ebuf.wr_uint1(VarTuple1).wr_uint1(_len); }
+    else if (_len < ui2_max) { ebuf.wr_uint1(VarTuple2).wr_uint2(_len); }
+    else                     { ebuf.wr_uint1(VarTuple8).wr_uint8(_len); }
 }
 
 export function ebuf_put_value(codec, ebuf, value) {
@@ -132,20 +132,20 @@ function ectx_put_value(ectx, value) {
     if (typeof value === 'number') {
         if (Number.isSafeInteger(value)) {                       // Integer path
             if (min_ConstNegInt <= value && value < 0) {
-                return ebuf.put_uint1(value + ui1_max);}
+                return ebuf.wr_uint1(value + ui1_max);}
             if (0 <= value && value < FixInt2) {
-                return ebuf.put_uint1(value);
+                return ebuf.wr_uint1(value);
             }
             if (-i2_max <= value && value < i2_max) {
-                return ebuf.put_uint1(FixInt2).put_int2(value);
+                return ebuf.wr_uint1(FixInt2).wr_int2(value);
             }
             if (-i4_max <= value && value < i4_max) {
-                return ebuf.put_uint1(FixInt4).put_int4(value);
+                return ebuf.wr_uint1(FixInt4).wr_int4(value);
             }
             // Safe integers fit the limits:
-            return ebuf.put_uint1(FixInt8).put_int8(value);
+            return ebuf.wr_uint1(FixInt8).wr_int8(value);
         } else {                                                 // Float path
-            return ebuf.put_uint1(FixFloat8).put_float8(value);
+            return ebuf.wr_uint1(FixFloat8).wr_float8(value);
         }
     }
 
@@ -155,23 +155,23 @@ function ectx_put_value(ectx, value) {
 
         // Str length header -- followed by string characters
         if (_len < 16) {
-            ebuf.put_uint1(FixStr0 + _len);
+            ebuf.wr_uint1(FixStr0 + _len);
         } else if (_len < ui1_max) {
-            ebuf.put_uint1(VarStr1).put_uint1(_len);
+            ebuf.wr_uint1(VarStr1).wr_uint1(_len);
         } else if (_len < ui2_max) {
-            ebuf.put_uint1(VarStr2).put_uint2(_len);
+            ebuf.wr_uint1(VarStr2).wr_uint2(_len);
         } else {
-            ebuf.put_uint1(VarStr8).put_uint8(_len);
+            ebuf.wr_uint1(VarStr8).wr_uint8(_len);
         }
-        return ebuf.put_bytes(str_bytes);
+        return ebuf.wr_bytes(str_bytes);
     }
 
     if (typeof value === 'boolean') {
-        return ebuf.put_uint1(value ? ConstValTrue : ConstValFalse);
+        return ebuf.wr_uint1(value ? ConstValTrue : ConstValFalse);
     }
 
     if (value === null || value === undefined) {
-        return ebuf.put_uint1(ConstValNone);
+        return ebuf.wr_uint1(ConstValNone);
     }
 
     // Type detection for complex types

@@ -39,20 +39,20 @@ export class EncodeBuffer {
     }
 
     // 'bytes' means: Uint8Array
-    put_bytes(value)  { return this.wr('set', value.length, value, true) }
+    wr_bytes(value)  { return this.wr('set', value.length, value, true) }
 
-    put_int1(value)   { return this.wr('setInt8',      1, value) }
-    put_int2(value)   { return this.wr('setInt16',     2, value) }
-    put_int4(value)   { return this.wr('setInt32',     4, value) }
-    put_int8(value)   { return this.wr('setBigInt64',  8, BigInt(value)) }
+    wr_int1(value)   { return this.wr('setInt8',      1, value) }
+    wr_int2(value)   { return this.wr('setInt16',     2, value) }
+    wr_int4(value)   { return this.wr('setInt32',     4, value) }
+    wr_int8(value)   { return this.wr('setBigInt64',  8, BigInt(value)) }
 
-    put_uint1(value)  { return this.wr('setUint8',     1, value) }
-    put_uint2(value)  { return this.wr('setUint16',    2, value) }
-    put_uint4(value)  { return this.wr('setUint32',    4, value) }
-    put_uint8(value)  { return this.wr('setBigUint64', 8, BigInt(value)) }
+    wr_uint1(value)  { return this.wr('setUint8',     1, value) }
+    wr_uint2(value)  { return this.wr('setUint16',    2, value) }
+    wr_uint4(value)  { return this.wr('setUint32',    4, value) }
+    wr_uint8(value)  { return this.wr('setBigUint64', 8, BigInt(value)) }
 
-    put_float4(value) { return this.wr('setFloat32',   4, value) }
-    put_float8(value) { return this.wr('setFloat64',   8, value) }
+    wr_float4(value) { return this.wr('setFloat32',   4, value) }
+    wr_float8(value) { return this.wr('setFloat64',   8, value) }
 
     as_bytes() {
         // Copy buffer slice so that the result is not resizable!

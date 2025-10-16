@@ -9,7 +9,7 @@ export class EncodeDecode {
 
         this.ebuf_put_value(ebuf, codec_type);
 
-        if (new_codec === null) { ebuf.put_bytes(new_value); }
+        if (new_codec === null) { ebuf.wr_bytes(new_value); }
         else                    { new_codec.ebuf_put_value(ebuf, new_value); }
 
         return ebuf.as_bytes();

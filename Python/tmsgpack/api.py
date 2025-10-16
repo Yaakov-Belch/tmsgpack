@@ -9,7 +9,7 @@ class EncodeDecode:
         codec_type, new_codec, new_value = self.prep_encode(value, target)
         ebuf = EncodeBuffer()
         self.ebuf_put_value(ebuf, codec_type)
-        if new_codec is None: ebuf.put_bytes(new_value)
+        if new_codec is None: ebuf.wr_bytes(new_value)
         else:                 new_codec.ebuf_put_value(ebuf, new_value)
         return ebuf.as_bytes()
 

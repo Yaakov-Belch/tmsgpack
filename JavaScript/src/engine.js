@@ -114,6 +114,8 @@ class EncodeCtx {
             ectx_put_value(this, v);
         }
     }
+
+    put_value(value) { ectx_put_value(this, value) }
 }
 
 function _list_header(ebuf, _len) {

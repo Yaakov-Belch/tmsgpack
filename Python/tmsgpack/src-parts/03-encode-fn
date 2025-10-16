@@ -76,6 +76,9 @@ cdef class EncodeCtx:
             ectx_put_value(self, k)
             ectx_put_value(self, v)
 
+    cpdef put_value(self, object value):
+        ectx_put_value(self, value)
+
 cdef bint _tuple_header(BaseEncodeBuffer ebuf, uint64_t _len):
     if   _len < 17:      ebuf.wr_uint1(<uint8_t>(FixTuple0 + _len))
     elif _len < ui1_max: ebuf.wr_uint1(VarTuple1).wr_uint1(<uint8_t>_len)

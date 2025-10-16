@@ -1,7 +1,7 @@
 # THIS FILE IS AUTOMATICALLY CREATED BY THE test-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
-__version__ = "0.2.16"
+__version__ = "0.2.17"
 
 from libc.stdint cimport int8_t, int16_t, int32_t, int64_t
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
@@ -94,6 +94,9 @@ cdef class EncodeCtx:
             else:           raise TMsgpackError('ectx used twice.')
         self._used = True
         if expect_used: self.value = None
+
+    cpdef put_str(self, object _type, str value):
+        self.put_bytes(_type, value.encode('utf-8'))
 
     cpdef put_bytes(self, object _type, object value):
         cdef BaseEncodeBuffer ebuf = self.ebuf

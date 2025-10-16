@@ -62,6 +62,8 @@ class EncodeCtx {
         if(expect_used) {this.value = null}
     }
 
+    put_str(_type, value) { this.put_bytes(_type, this.ebuf.textEncoder.encode(value)) }
+
     put_bytes(_type, value) {
         this._mark_use(false);
         const ebuf = this.ebuf;

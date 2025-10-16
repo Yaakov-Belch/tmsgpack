@@ -237,7 +237,7 @@ class DecodeCtx {
     take_bytes() {
         this._mark_use(false)
         if(!this._bytes) { throw new TMsgpackError('take_bytes called for list') }
-        return this.dbuf.take_bytes(this._len)
+        return this.dbuf.rd_bytes(this._len)
     }
 }
 
@@ -247,7 +247,7 @@ export function dbuf_take_value(codec, dbuf) {
 function dctx_take_value(dctx) {
     const codec = dctx.codec;
     const dbuf  = dctx.dbuf;
-    const opcode = dbuf.take_uint1();
+    const opcode = dbuf.rd_uint1();
 
     if (!(0 <= opcode && opcode < ui1_max)) {
         throw new TMsgpackError(`Opcode out of range 0-255: ${opcode}`);
@@ -266,9 +266,9 @@ function dctx_take_value(dctx) {
 
     if (FixTuple0 <= opcode) {
         let _len;
-        if (opcode === VarTuple1)      { _len = dbuf.take_uint1();  }
-        else if (opcode === VarTuple2) { _len = dbuf.take_uint2();  }
-        else if (opcode === VarTuple8) { _len = dbuf.take_uint8();  }
+        if (opcode === VarTuple1)      { _len = dbuf.rd_uint1();  }
+        else if (opcode === VarTuple2) { _len = dbuf.rd_uint2();  }
+        else if (opcode === VarTuple8) { _len = dbuf.rd_uint8();  }
         else                           { _len = opcode - FixTuple0; } // FixTuple0-16
 
         const _type = dbuf_take_value(codec, dbuf);
@@ -285,9 +285,9 @@ function dctx_take_value(dctx) {
 
     if (FixBytes0 <= opcode) {
         let _len;
-        if (opcode === VarBytes1)      { _len = dbuf.take_uint1(); }
-        else if (opcode === VarBytes2) { _len = dbuf.take_uint2(); }
-        else if (opcode === VarBytes8) { _len = dbuf.take_uint8(); }
+        if (opcode === VarBytes1)      { _len = dbuf.rd_uint1(); }
+        else if (opcode === VarBytes2) { _len = dbuf.rd_uint2(); }
+        else if (opcode === VarBytes8) { _len = dbuf.rd_uint8(); }
         else                           { _len = _map_01248_16_20_32[opcode - FixBytes0]; }
         // The else branch catches FixBytes0/1/2/4/8/16/20/32
 
@@ -300,18 +300,18 @@ function dctx_take_value(dctx) {
     }
 
     if (FixStr0 <= opcode) {
-        if (opcode === VarStr1) { return dbuf.take_str(dbuf.take_uint1()); }
-        if (opcode === VarStr2) { return dbuf.take_str(dbuf.take_uint2()); }
-        if (opcode === VarStr8) { return dbuf.take_str(dbuf.take_uint8()); }
-        else                    { return dbuf.take_str(opcode - FixStr0);  } // FixStr0-15
+        if (opcode === VarStr1) { return dbuf.rd_str(dbuf.rd_uint1()); }
+        if (opcode === VarStr2) { return dbuf.rd_str(dbuf.rd_uint2()); }
+        if (opcode === VarStr8) { return dbuf.rd_str(dbuf.rd_uint8()); }
+        else                    { return dbuf.rd_str(opcode - FixStr0);  } // FixStr0-15
     }
 
-    if (FixFloat8 <= opcode)    { return dbuf.take_float8(); }
+    if (FixFloat8 <= opcode)    { return dbuf.rd_float8(); }
 
     if (FixInt2 <= opcode) {
-        if (opcode === FixInt2) { return dbuf.take_int2(); }
-        if (opcode === FixInt4) { return dbuf.take_int4(); }
-        if (opcode === FixInt8) { return dbuf.take_int8(); }
+        if (opcode === FixInt2) { return dbuf.rd_int2(); }
+        if (opcode === FixInt4) { return dbuf.rd_int4(); }
+        if (opcode === FixInt8) { return dbuf.rd_int8(); }
     }
 
     if (0 <= opcode) return opcode; // const integer

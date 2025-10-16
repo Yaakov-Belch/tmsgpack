@@ -87,15 +87,15 @@ export class DecodeBuffer {
         }
     }
 
-    take_bytes(n) { return this.rd(n, 'rdUint8Array'); }
-    take_str(n)   { return this.textDecoder.decode(this.take_bytes(n)); }
-    take_int1()   { return this.rd(1, 'getInt8'); }
-    take_int2()   { return this.rd(2, 'getInt16'); }
-    take_int4()   { return this.rd(4, 'getInt32'); }
-    take_int8()   { return Number(this.rd(8, 'getBigInt64')); }
-    take_uint1()  { return this.rd(1, 'getUint8'); }
-    take_uint2()  { return this.rd(2, 'getUint16'); }
-    take_uint4()  { return this.rd(4, 'getUint32'); }
-    take_uint8()  { return Number(this.rd(8, 'getBigUint64')); }
-    take_float8() { return this.rd(8, 'getFloat64'); }
+    rd_bytes(n) { return this.rd(n, 'rdUint8Array'); }
+    rd_str(n)   { return this.textDecoder.decode(this.rd_bytes(n)); }
+    rd_int1()   { return this.rd(1, 'getInt8'); }
+    rd_int2()   { return this.rd(2, 'getInt16'); }
+    rd_int4()   { return this.rd(4, 'getInt32'); }
+    rd_int8()   { return Number(this.rd(8, 'getBigInt64')); }
+    rd_uint1()  { return this.rd(1, 'getUint8'); }
+    rd_uint2()  { return this.rd(2, 'getUint16'); }
+    rd_uint4()  { return this.rd(4, 'getUint32'); }
+    rd_uint8()  { return Number(this.rd(8, 'getBigUint64')); }
+    rd_float8() { return this.rd(8, 'getFloat64'); }
 }

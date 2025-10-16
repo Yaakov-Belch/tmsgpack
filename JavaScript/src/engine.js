@@ -182,7 +182,7 @@ function ectx_put_value(ectx, value) {
     if      (is_bytes) { ectx._v(null).put_bytes(true, value) }
     else if (is_list)  { ectx._v(null).put_sequence(true, value) }
     else if (is_dict)  { ectx._v(null).put_dict(null, value, codec.sort_keys) }
-    else               { codec.decompose_value(ectx._v(value)); ectx._mark_use(true) }
+    else               { codec.encode_value(ectx._v(value)); ectx._mark_use(true) }
 }
 
 class DecodeCtx {
@@ -278,7 +278,7 @@ function dctx_take_value(dctx) {
         }
         if (_type === null)  { return dctx._ltb(_len, _type, false).take_dict() }
 
-        const result = codec.value_from_list(dctx._ltb(_len, _type, false))
+        const result = codec.decode_from_list(dctx._ltb(_len, _type, false))
         dctx._mark_use(true)
         return result
     }
@@ -294,7 +294,7 @@ function dctx_take_value(dctx) {
         const _type  = dbuf_take_value(codec, dbuf);
 
         if (_type === true) { return dctx._ltb(_len, _type, true).take_bytes() }
-        const result = codec.value_from_bytes(dctx._ltb(_len, _type, true))
+        const result = codec.decode_from_bytes(dctx._ltb(_len, _type, true))
         dctx._mark_use(True)
         return result
     }

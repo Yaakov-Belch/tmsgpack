@@ -37,17 +37,17 @@ export class BasicCodec extends EncodeDecode {
         throw new TMsgpackError(`Unsupported codec_type: ${codec_type}`);
     }
 
-    decompose_value(ectx) {
+    encode_value(ectx) {
         throw new TMsgpackError(`Unsupported value: ${ectx.value}`);
     }
 
-    value_from_bytes(dctx) {
+    decode_from_bytes(dctx) {
         throw new TMsgpackError(
             `No bytes extension defined: obj_type=${dctx._type}`,
         );
     }
 
-    value_from_list(dctx) {
+    decode_from_list(dctx) {
         throw new TMsgpackError(
             `No list extension defined: obj_type=${dctx._type}`
         );

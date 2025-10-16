@@ -70,7 +70,7 @@ export class MyCodec extends EncodeDecode {
         throw new TMsgpackError(`Unsupported codec_type: ${codec_type}`);
     }
 
-    decompose_value(ectx) {
+    encode_value(ectx) {
         const type_name   = this.value_to_type_name(ectx.value)
         if(!(type_name in this.encode_cache)) {
             const constructor = this.name_to_constructor(type_name)
@@ -83,11 +83,11 @@ export class MyCodec extends EncodeDecode {
         this.encode_cache[type_name](ectx)
     }
 
-    value_from_bytes(dctx) {
+    decode_from_bytes(dctx) {
         throw new TMsgpackError(`No bytes extension defined: obj_type=${dctx._type}`);
     }
 
-    value_from_list(dctx) {
+    decode_from_list(dctx) {
         const _type = dctx._type
         if(!(_type in this.decode_cache)) {
             const constructor = this.name_to_constructor(_type)

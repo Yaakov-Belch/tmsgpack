@@ -138,5 +138,5 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is tuple: ectx._v(None).put_sequence(True, value)
     elif t is list:  ectx._v(None).put_sequence(False, value)
     elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
-    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
+    else:            codec.encode_value(ectx._v(value)); ectx._mark_use(True)
 

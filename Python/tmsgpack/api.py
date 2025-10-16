@@ -35,13 +35,13 @@ class BasicCodec(EncodeDecode):
         if codec_type is None: return self
         raise TMsgpackError(f'Unsupported codec_type: {codec_type}')
 
-    def decompose_value(self, ectx):
+    def encode_value(self, ectx):
         raise TMsgpackError(f'Unsupported value: {ectx.value}')
 
-    def value_from_bytes(self, dctx):
+    def decode_from_bytes(self, dctx):
         raise TMsgpackError(f'No bytes extension defined: {dctx._type}')
 
-    def value_from_list(self, dctx):
+    def decode_from_list(self, dctx):
         raise TMsgpackError(f'No tuple extension defined: {dctx._type}')
 
 

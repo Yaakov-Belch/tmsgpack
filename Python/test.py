@@ -33,6 +33,7 @@ def main():
     codec=MyCodec(types=[Foo])
     check_round_trip([Foo(1,2), Foo(2,3)], codec=codec, comment='Foo')
 
+    print(f'version: v{__version__}')
 def check_round_trip(values, comment='', codec=basic_codec):
     ok = not_ok = 0
     for value in values:
@@ -78,7 +79,7 @@ class MyCodec(EncodeDecode):
         if codec_type is None: return self
         raise TMsgpackError(f'Unsupported codec_type: {codec_type}')
 
-    def decompose_value(self, ectx):
+    def encode_value(self, ectx):
         t = type(ectx.value)
         if t not in self.encode_cache:
             type_name   = self.type_to_name(t)
@@ -91,10 +92,10 @@ class MyCodec(EncodeDecode):
             self.encode_cache[t] = encode_handler
         self.encode_cache[t](ectx)
 
-    def value_from_bytes(self, dctx):
+    def decode_from_bytes(self, dctx):
         raise TMsgpackError(f'No bytes extension defined: {dctx._type}')
 
-    def value_from_list(self, dctx):
+    def decode_from_list(self, dctx):
         _type = dctx._type
         if _type not in self.decode_cache:
             constructor = self.name_to_constructor(_type)

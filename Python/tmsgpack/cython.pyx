@@ -1,7 +1,7 @@
 # THIS FILE IS AUTOMATICALLY CREATED BY THE test-run.sh SCRIPT!
 # DON'T EDIT THIS FILE.  EDIT THE SOURCES, INSTEAD: tmsgpack/src-parts/*
 
-__version__ = "0.2.14"
+__version__ = "0.2.15"
 
 from libc.stdint cimport int8_t, int16_t, int32_t, int64_t
 from libc.stdint cimport uint8_t, uint16_t, uint32_t, uint64_t
@@ -206,7 +206,7 @@ cdef ectx_put_value(EncodeCtx ectx, object value):
     elif t is tuple: ectx._v(None).put_sequence(True, value)
     elif t is list:  ectx._v(None).put_sequence(False, value)
     elif t is dict:  ectx._v(None).put_dict(None, value, codec.sort_keys)
-    else:            codec.decompose_value(ectx._v(value)); ectx._mark_use(True)
+    else:            codec.encode_value(ectx._v(value)); ectx._mark_use(True)
 
 cdef class DecodeCtx:
     cdef readonly TMsgpackCodec  codec
@@ -301,7 +301,7 @@ cdef dctx_take_value(DecodeCtx dctx):
         if _type is True:  return dctx._ltb(_len, _type, False).take_tuple()
         if _type is False: return dctx._ltb(_len, _type, False).take_list()
         if _type is None:  return dctx._ltb(_len, _type, False).take_dict()
-        result = codec.value_from_list(dctx._ltb(_len, _type, False))
+        result = codec.decode_from_list(dctx._ltb(_len, _type, False))
         dctx._mark_use(True)
         return result
 
@@ -315,7 +315,7 @@ cdef dctx_take_value(DecodeCtx dctx):
         _type = dbuf_take_value(codec, dbuf)
 
         if _type is True: return dctx._ltb(_len, _type, True).take_bytes()
-        result = codec.value_from_bytes(dctx._ltb(_len, _type, True))
+        result = codec.decode_from_bytes(dctx._ltb(_len, _type, True))
         dctx._mark_use(True)
         return result
 

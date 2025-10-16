@@ -28,7 +28,7 @@ export class EncodeDecode {
 }
 
 export class BasicCodec extends EncodeDecode {
-    constructor() { super(); this.sort_keys = true; this.use_cache = false; }
+    constructor() { super(); this.sort_keys = true; }
 
     prep_encode(value, target) { return [null, this, value]; }
 

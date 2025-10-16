@@ -52,19 +52,15 @@ function tmsgpack_test() {
         1, 2, 3, 4, {'a': 'hello', 'b': ['world', 5, 6, 7]}
     ]], 'nested value');
 
-    const yhub  = new TestRouterHub(111)
-    const codec = new MyCodec(yhub, {Foo, Bar})
+    const codec = new MyCodec({Foo})
 
-    // check_not_supported([yhub], 'yhub not encodable', codec)
-    check_round_trip([new Foo(1,2), new Foo(2,3)], 'Foo without yhub', codec)
-    check_round_trip([new Bar(1,2,yhub), new Bar(11,22,yhub)], 'Bar with yhub', codec)
+    check_round_trip([new Foo(1,2), new Foo(2,3)], 'Foo', codec)
 }
 
 export class MyCodec extends EncodeDecode {
-    constructor(yhub, types) {
-        super();
-        this.sort_keys=true; this.use_cache=true;
-        this.yhub=yhub; this.types=types;
+    constructor(types) {
+        super(); this.sort_keys=true; this.types=types;
+        this.encode_cache={}; this.decode_cache={};
     }
 
     prep_encode(value, target) { return [null, this, value]; }
@@ -76,9 +72,15 @@ export class MyCodec extends EncodeDecode {
 
     decompose_value(ectx) {
         const type_name   = this.value_to_type_name(ectx.value)
-        const constructor = this.name_to_constructor(type_name)
-        const args        = this.constructor_to_args_without_yhub(constructor)
-        ectx.set_dict_encode_handler(type_name, args)
+        if(!(type_name in this.encode_cache)) {
+            const constructor = this.name_to_constructor(type_name)
+            const attrs       = this.constructor_to_attrs(constructor)
+            this.encode_cache[type_name] = (ectx) => {
+                const value = ectx.value
+                ectx.put_sequence(type_name, attrs.flatMap((attr) => [attr, value[attr]]))
+            }
+        }
+        this.encode_cache[type_name](ectx)
     }
 
     value_from_bytes(dctx) {
@@ -86,10 +88,16 @@ export class MyCodec extends EncodeDecode {
     }
 
     value_from_list(dctx) {
-        const constructor  = this.name_to_constructor(dctx._type)
-        const args         = this.constructor_to_args(constructor)
-        const extra_kwargs = {'yhub': dctx.codec.yhub}
-        return dctx.set_dict_decode_handler2(constructor, args, extra_kwargs)
+        const _type = dctx._type
+        if(!(_type in this.decode_cache)) {
+            const constructor = this.name_to_constructor(_type)
+            const attrs       = this.constructor_to_attrs(constructor)
+            this.decode_cache[_type] = (dctx) => {
+                const kwargs = dctx.take_dict()
+                return new constructor(...attrs.map(attr=>kwargs[attr]))
+            }
+        }
+        return this.decode_cache[_type](dctx)
     }
 
     value_to_type_name(value) { return value.constructor.class_name }
@@ -98,11 +106,8 @@ export class MyCodec extends EncodeDecode {
         if(res) { return res }
         else    { throw new TMsgpackError(`Unsupported type: ${name}`) }
     }
-    constructor_to_args(constructor) { return constructor.class_attrs }
+    constructor_to_attrs(constructor) { return constructor.class_attrs }
 
-    constructor_to_args_without_yhub(constructor) {
-        return this.constructor_to_args(constructor).filter(attr=>attr !== 'yhub')
-    }
 }
 
 
@@ -111,14 +116,6 @@ class Foo {
     static class_attrs = ['x', 'y']
     constructor(x, y) { this.x=x; this.y=y; }
 }
-
-class Bar {
-    static class_name = 'Bar'
-    static class_attrs = ['x', 'y', 'yhub']
-    constructor(x, y, yhub) { this.x=x; this.y=y; this.yhub=yhub; }
-}
-
-class TestRouterHub { constructor(id) { this.id=id } }  // This is not encodable
 
 function check_round_trip(values, comment = '', codec=basic_codec) {
     let ok = 0;
@@ -141,6 +138,7 @@ function check_round_trip(values, comment = '', codec=basic_codec) {
     console.log(`ok=${ok} not_ok=${not_ok} ${comment}`);
 }
 
+// This test function is currently not used.
 function check_not_supported(values, comment='', codec=basic_codec) {
     let ok = 0;
     let notOk = 0;

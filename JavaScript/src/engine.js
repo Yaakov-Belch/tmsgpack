@@ -42,25 +42,16 @@ const ConstNegInt = 192;
 
 const min_ConstNegInt = ConstNegInt - ui1_max; // This is -64
 
-function get_cached_dict(codec, key) {
-    if(!(key in codec)) { codec[key] = Object.create(null); }  // improved {}
-    return codec[key]
-}
-
 class EncodeCtx {
     constructor(codec, ebuf) {
         this.codec     = codec;
         this.ebuf      = ebuf;
         this.value     = null;
-        this._used     = true;   // Set to false direclty before use.
         this.sort_keys = codec.sort_keys
-        this.use_cache = codec.use_cache
-        this._decompose_value_cache = get_cached_dict(codec, '_decompose_value_cache')
+        this._used     = true;   // Set to false directly before use.
     }
 
-    _vk(value, cache_key) {
-        this.value=value; this.cache_key=cache_key; this._used=false; return this;
-    }
+    _v(value) { this.value=value; this._used=false; return this}
 
     _mark_use(expect_used) {
         if(expect_used !== this._used) {
@@ -120,27 +111,6 @@ class EncodeCtx {
             ectx_put_value(this, k);
             ectx_put_value(this, v);
         }
-    }
-
-    set_encode_handler(handler) {
-        if(this.cache_key===null) {throw new TMsgpackError('Repeated set_encode_handler')}
-        this._decompose_value_cache[this.cache_key] = handler
-        this.cache_key = null
-        handler(this)
-    }
-
-    set_dict_encode_handler(_type, keys) {
-        this.set_encode_handler((ectx) => {
-            ectx._mark_use(false)
-            _list_header(ectx.ebuf, keys.length * 2)
-            ectx_put_value(ectx, _type)
-
-            const value = ectx.value
-            for(const key of keys) {
-                ectx_put_value(ectx, key)
-                ectx_put_value(ectx, value[key])
-            }
-        })
     }
 }
 
@@ -209,37 +179,27 @@ function ectx_put_value(ectx, value) {
     const is_list  = Array.isArray(value)
     const is_dict  = value && typeof value === 'object' && value.constructor === Object
 
-    if      (is_bytes) { ectx._vk(null, null).put_bytes(true, value) }
-    else if (is_list)  { ectx._vk(null, null).put_sequence(true, value) }
-    else if (is_dict)  { ectx._vk(null, null).put_dict(null, value, codec.sort_keys) }
-    else {
-        const t       = ectx.use_cache && ectx.codec.value_to_type_name(value)
-        const handler = ectx.use_cache && ectx._decompose_value_cache[t]
-        if(handler) { handler(ectx._vk(value, null)); ectx._mark_use(true)}
-        else        { codec.decompose_value(ectx._vk(value, t)); ectx._mark_use(true) }
-    }
+    if      (is_bytes) { ectx._v(null).put_bytes(true, value) }
+    else if (is_list)  { ectx._v(null).put_sequence(true, value) }
+    else if (is_dict)  { ectx._v(null).put_dict(null, value, codec.sort_keys) }
+    else               { codec.decompose_value(ectx._v(value)); ectx._mark_use(true) }
 }
 
 class DecodeCtx {
     constructor(codec, dbuf) {
-        this.codec     = codec;
-        this.dbuf      = dbuf;
-        this._len      = 0;
-        this._type     = null;
-        this._bytes    = false;
-        this.cache_key = null;
-        this._used     = true;   // Set to false direclty before use.
-        this._value_from_list_cache  = get_cached_dict(codec, '_value_from_list_cache')
-        this._value_from_bytes_cache = get_cached_dict(codec, '_value_from_bytes_cache')
-
+        this.codec  = codec;
+        this.dbuf   = dbuf;
+        this._len   = 0;
+        this._type  = null;
+        this._bytes = false;
+        this._used  = true;   // Set to false directly before use.
     }
 
-    _ltbk(_len, _type, _bytes, cache_key) {
-        this._len      = _len;
-        this._type     = _type;
-        this._bytes    = _bytes;
-        this.cache_key = cache_key;
-        this._used     = false;
+    _ltb(_len, _type, _bytes) {
+        this._len   = _len;
+        this._type  = _type;
+        this._bytes = _bytes;
+        this._used  = false;
         return this
     }
 
@@ -279,28 +239,6 @@ class DecodeCtx {
         if(!this._bytes) { throw new TMsgpackError('take_bytes called for list') }
         return this.dbuf.take_bytes(this._len)
     }
-
-    set_decode_handler(handler) {
-        if(this.cache_key === null) {
-            throw new TMsgpackError('Repeated set_decode_handler')
-        }
-        if(this._bytes) { this._value_from_bytes_cache[this.cache_key] = handler }
-        else            { this._value_from_list_cache[this.cache_key]  = handler }
-        this.cache_key = null
-        return handler(this)
-    }
-
-    set_dict_decode_handler2(constructor, args, extra_kwargs=null) {
-        return this.set_decode_handler(ectx => {
-            let kwargs = ectx.take_dict()
-            if(extra_kwargs !== null) { kwargs = {...kwargs, ...extra_kwargs} }
-            return new constructor(...args.map(arg => {
-                if(kwargs.hasOwnProperty(arg)) { return kwargs[arg] }
-                else { throw new TMsgpackError(`Attribute '${arg}' not provided.`) }
-            }));
-        })
-    }
-
 }
 
 export function dbuf_take_value(codec, dbuf) {
@@ -336,13 +274,11 @@ function dctx_take_value(dctx) {
         const _type = dbuf_take_value(codec, dbuf);
 
         if(_type === true || _type === false) { // In JavaScript tuples are lists.
-            return dctx._ltbk(_len, _type, false, null).take_list()
+            return dctx._ltb(_len, _type, false).take_list()
         }
-        if (_type === null)  { return dctx._ltbk(_len, _type, false, null).take_dict() }
+        if (_type === null)  { return dctx._ltb(_len, _type, false).take_dict() }
 
-        const handler = dctx.use_cache && dctx._value_from_list_cache[_type]
-        dctx._ltbk(_len, _type, false, _type);
-        const result = handler? handler(dctx) : codec.value_from_list(dctx)
+        const result = codec.value_from_list(dctx._ltb(_len, _type, false))
         dctx._mark_use(true)
         return result
     }
@@ -357,12 +293,9 @@ function dctx_take_value(dctx) {
 
         const _type  = dbuf_take_value(codec, dbuf);
 
-        if (_type === true) { return dctx._ltbk(_len, _type, true, null).take_bytes() }
-
-        const handler = dctx.use_cache && dctx._value_from_bytes_cache[_type]
-        dctx._ltbk(_len, _type, true, _type);
-        const result = handler? handler(dctx) : codec.value_from_bytes(dctx)
-        dctx._mark_use(true)
+        if (_type === true) { return dctx._ltb(_len, _type, true).take_bytes() }
+        const result = codec.value_from_bytes(dctx._ltb(_len, _type, true))
+        dctx._mark_use(True)
         return result
     }
 

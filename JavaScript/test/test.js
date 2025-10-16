@@ -110,7 +110,6 @@ export class MyCodec extends EncodeDecode {
 
 }
 
-
 class Foo {
     static class_name  = 'Foo'
     static class_attrs = ['x', 'y']

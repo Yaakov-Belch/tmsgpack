@@ -52,7 +52,7 @@ cdef class DecodeCtx:
     cpdef bytes take_bytes(self):
         if not self._bytes: raise TMsgpackError('take_bytes called for list')
         self._mark_use(False)
-        return self.dbuf.take_bytes(self._len)
+        return self.dbuf.rd_bytes(self._len)
 
 cpdef object dbuf_take_value(TMsgpackCodec codec, BaseDecodeBuffer dbuf):
     """Take one msg out of dbuf and return the decoded value."""
@@ -64,7 +64,7 @@ cdef dctx_take_value(DecodeCtx dctx):
     cdef uint64_t _len
     cdef object   _type
 
-    cdef uint8_t  opcode = dbuf.take_uint1()
+    cdef uint8_t  opcode = dbuf.rd_uint1()
 
     if not (0 <= opcode < ui1_max):
         raise TMsgpackError(f'Opcode out of range 0-255: {opcode}')
@@ -80,9 +80,9 @@ cdef dctx_take_value(DecodeCtx dctx):
     if ConstValStart <= opcode: return _map_consts[opcode - ConstValStart]
 
     if FixTuple0 <= opcode:
-        if   opcode == VarTuple1: _len = <uint64_t>dbuf.take_uint1()
-        elif opcode == VarTuple2: _len = <uint64_t>dbuf.take_uint2()
-        elif opcode == VarTuple8: _len = <uint64_t>dbuf.take_uint8()
+        if   opcode == VarTuple1: _len = <uint64_t>dbuf.rd_uint1()
+        elif opcode == VarTuple2: _len = <uint64_t>dbuf.rd_uint2()
+        elif opcode == VarTuple8: _len = <uint64_t>dbuf.rd_uint8()
         else:                     _len = <uint64_t>(opcode - FixTuple0)
         # The else branch handles FixTuple0, ..., FixTuple16
 
@@ -96,9 +96,9 @@ cdef dctx_take_value(DecodeCtx dctx):
         return result
 
     if FixBytes0 <= opcode:
-        if   opcode == VarBytes1: _len = <uint64_t>dbuf.take_uint1()
-        elif opcode == VarBytes2: _len = <uint64_t>dbuf.take_uint2()
-        elif opcode == VarBytes8: _len = dbuf.take_uint8()
+        if   opcode == VarBytes1: _len = <uint64_t>dbuf.rd_uint1()
+        elif opcode == VarBytes2: _len = <uint64_t>dbuf.rd_uint2()
+        elif opcode == VarBytes8: _len = dbuf.rd_uint8()
         else:                     _len = <uint64_t>_map_01248_16_20_32[opcode - FixBytes0]
         # The else branch catches FixBytes0/1/2/4/8/16/20/32
 
@@ -110,17 +110,17 @@ cdef dctx_take_value(DecodeCtx dctx):
         return result
 
     if FixStr0 <= opcode:
-        if opcode == VarStr1: return dbuf.take_str(<int>dbuf.take_uint1())
-        if opcode == VarStr2: return dbuf.take_str(<int>dbuf.take_uint2())
-        if opcode == VarStr8: return dbuf.take_str(<int>dbuf.take_uint8())
-        else:                 return dbuf.take_str(<int>(opcode - FixStr0))
+        if opcode == VarStr1: return dbuf.rd_str(<int>dbuf.rd_uint1())
+        if opcode == VarStr2: return dbuf.rd_str(<int>dbuf.rd_uint2())
+        if opcode == VarStr8: return dbuf.rd_str(<int>dbuf.rd_uint8())
+        else:                 return dbuf.rd_str(<int>(opcode - FixStr0))
         # The else branch catches FixStr0, ..., FixStr15
 
-    if FixFloat8 <= opcode:   return dbuf.take_float8()
+    if FixFloat8 <= opcode:   return dbuf.rd_float8()
     if FixInt2   <= opcode:
-        if opcode == FixInt2: return <int64_t>dbuf.take_int2()
-        if opcode == FixInt4: return <int64_t>dbuf.take_int4()
-        if opcode == FixInt8: return dbuf.take_int8()
+        if opcode == FixInt2: return <int64_t>dbuf.rd_int2()
+        if opcode == FixInt4: return <int64_t>dbuf.rd_int4()
+        if opcode == FixInt8: return dbuf.rd_int8()
 
     if 0         <= opcode:   return <int64_t>opcode  # const integer
 

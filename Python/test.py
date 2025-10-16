@@ -30,10 +30,8 @@ def main():
         1,2,3,4, {'a':'hello', 'b': ['world', 5,6,7]},
     ]], 'nested value')
 
-    yhub=TestRouterHub(id=111); codec=MyCodec(yhub=yhub, types=(Foo, Bar))
-    check_not_supported([yhub], codec=codec, comment='yhub not encodable')
+    codec=MyCodec(types=[Foo])
     check_round_trip([Foo(1,2), Foo(2,3)], codec=codec, comment='Foo')
-    check_round_trip([Bar(1,2,yhub=yhub), Bar(3,4,yhub=yhub)], codec=codec, comment='Bar')
 
 def check_round_trip(values, comment='', codec=basic_codec):
     ok = not_ok = 0
@@ -50,7 +48,7 @@ def check_round_trip(values, comment='', codec=basic_codec):
 
     print(f'{ok=} {not_ok=} {comment}')
 
-def check_not_supported(values, codec, comment):
+def check_not_supported(values, codec, comment): # Not currently used.
     ok = not_ok = 0
     for value in values:
         try: codec.encode(value); not_ok+=1; print(f'MISSING ERROR: {value}')
@@ -66,8 +64,6 @@ import inspect
 @dataclass
 class MyCodec(EncodeDecode):
     sort_keys = True
-
-    yhub: 'TestRouterHub'
     types: Sequence
 
     encode_cache: dict = field(repr=False, default_factory=dict)
@@ -87,7 +83,7 @@ class MyCodec(EncodeDecode):
         if t not in self.encode_cache:
             type_name   = self.type_to_name(t)
             constructor = self.name_to_constructor(type_name)
-            args        = self.constructor_to_args_without_yhub(constructor)
+            args        = self.constructor_to_args(constructor)
 
             def encode_handler(ectx):
                 value = ectx.value
@@ -102,12 +98,7 @@ class MyCodec(EncodeDecode):
         _type = dctx._type
         if _type not in self.decode_cache:
             constructor = self.name_to_constructor(_type)
-            with_yhub   = 'yhub' in self.constructor_to_args(constructor)
-            yhub        = dctx.codec.yhub
-
-            def decode_handler(dctx):
-                if with_yhub: return constructor(**dctx.take_dict(), yhub=yhub)
-                else:         return constructor(**dctx.take_dict())
+            def decode_handler(dctx): return constructor(**dctx.take_dict())
             self.decode_cache[_type] = decode_handler
         return self.decode_cache[_type](dctx)
 
@@ -117,24 +108,11 @@ class MyCodec(EncodeDecode):
         raise TMsgpackError(f'Unsupported type: {name}')
     def constructor_to_args(self, constructor):
         return inspect.signature(constructor).parameters.keys()
-    def constructor_to_args_without_yhub(self, constructor):
-        return [n for n in self.constructor_to_args(constructor) if n != 'yhub']
-
 
 @dataclass
 class Foo:
     x: int
     y: int
-
-@dataclass
-class Bar:
-    x: int
-    y: int
-    yhub: 'TestRouterHub'
-
-@dataclass
-class TestRouterHub:  # This is not encodable
-    id: int
 
 if __name__ == '__main__':
     main()

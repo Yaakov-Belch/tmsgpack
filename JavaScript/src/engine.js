@@ -220,8 +220,9 @@ class DecodeCtx {
         this._mark_use(false)
         if(this._bytes) { throw new TMsgpackError('take_list called for bytes') }
 
+        const _len  = this._len
         const _list = [];
-        for (let i = 0; i < this._len; i++) { _list.push(dctx_take_value(this)); }
+        for (let i = 0; i < _len; i++) { _list.push(dctx_take_value(this)); }
         return _list
     }
 
@@ -229,8 +230,9 @@ class DecodeCtx {
         this._mark_use(false)
         if(this._bytes) { throw new TMsgpackError('take_dict called for bytes') }
 
+        const _len  = this._len
         const result = {};
-        for (let i = 0; i < this._len; i += 2) {
+        for (let i = 0; i < _len; i += 2) {
             const k = dctx_take_value(this)
             const v = dctx_take_value(this)
             result[k] = v;
@@ -281,7 +283,7 @@ function dctx_take_value(dctx) {
         else if (opcode === VarTuple8) { _len = dbuf.rd_uint8();  }
         else                           { _len = opcode - FixTuple0; } // FixTuple0-16
 
-        const _type = dbuf_take_value(codec, dbuf);
+        const _type = dctx_take_value(dctx);
 
         if(_type === true || _type === false) { // In JavaScript tuples are lists.
             return dctx._ltb(_len, _type, false).take_list()
@@ -301,11 +303,11 @@ function dctx_take_value(dctx) {
         else                           { _len = _map_01248_16_20_32[opcode - FixBytes0]; }
         // The else branch catches FixBytes0/1/2/4/8/16/20/32
 
-        const _type  = dbuf_take_value(codec, dbuf);
+        const _type  = dctx_take_value(dctx);
 
         if (_type === true) { return dctx._ltb(_len, _type, true).take_bytes() }
         const result = codec.decode_from_bytes(dctx._ltb(_len, _type, true))
-        dctx._mark_use(True)
+        dctx._mark_use(true)
         return result
     }
 

@@ -1,6 +1,7 @@
 import {basic_codec, EncodeDecode, TMsgpackError} from "../index.js"
 
 function tmsgpack_test() {
+    check_round_trip([[[[1, 2]]]], '._len bug fixed');
     check_round_trip(range(-2000, 2000), 'small integers');
 
     check_round_trip([
@@ -52,8 +53,9 @@ function tmsgpack_test() {
         1, 2, 3, 4, {'a': 'hello', 'b': ['world', 5, 6, 7]}
     ]], 'nested value');
 
-    const codec = new MyCodec({Foo})
+    check_round_trip([1760628047033313535], 'large integer')
 
+    const codec = new MyCodec({Foo})
     check_round_trip([new Foo(1,2), new Foo(2,3)], 'Foo', codec)
 }
 

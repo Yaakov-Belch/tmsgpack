@@ -33,6 +33,8 @@ def main():
     codec=MyCodec(types=[Foo])
     check_round_trip([Foo(1,2), Foo(2,3)], codec=codec, comment='Foo')
 
+    check_round_trip([1760628047033313535], 'large integer')
+
     print(f'version: v{__version__}')
 def check_round_trip(values, comment='', codec=basic_codec):
     ok = not_ok = 0
